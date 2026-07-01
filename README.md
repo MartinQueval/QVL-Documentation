@@ -1,93 +1,175 @@
-# Documentation
+<h1 align="center">📚 QVL · Documentation</h1>
 
-Documentation QVL-Studio
+<p align="center">
+  <em>The central knowledge base for the entire QVL ecosystem.</em><br>
+  <em>La base de connaissances centrale de tout l'écosystème QVL.</em>
+</p>
 
-## Getting started
+<p align="center">
+  <img src="https://img.shields.io/badge/docs-central%20hub-6f42c1?style=for-the-badge" alt="Docs">
+  <img src="https://img.shields.io/badge/source-GitLab%20·%20private-fc6d26?style=for-the-badge&logo=gitlab&logoColor=white" alt="GitLab">
+  <img src="https://img.shields.io/badge/showcase-GitHub%20·%20public-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub">
+  <img src="https://img.shields.io/badge/built%20with-Claude%20·%20agentic%20AI-d97757?style=for-the-badge" alt="Claude">
+  <img src="https://img.shields.io/badge/code-open%20source-3fb950?style=for-the-badge" alt="Open Source">
+</p>
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+<p align="center">
+  <strong>🌐 Read in :</strong>&nbsp;
+  <a href="#-english">🇬🇧 English</a>&nbsp;·&nbsp;
+  <a href="#-français">🇫🇷 Français</a>
+</p>
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+---
 
-## Add your files
+<!-- ============================== ENGLISH ============================== -->
+<details open>
+<summary><h3>🇬🇧&nbsp;&nbsp;English</h3></summary>
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+<a id="-english"></a>
 
+## 📖 About this repository
+
+Welcome to the documentation hub of **QVL**. This repository has a single mission: to **centralize the documentation of every QVL project** in one place. Rather than letting knowledge scatter across dozens of individual codebases, every architectural decision, guide and reference lives here — a single, coherent source of truth that ties the whole ecosystem together.
+
+Whether you are a curious visitor, a developer looking to reuse a component, or simply exploring how the pieces fit together, **this is where you start**.
+
+## 🧩 The QVL ecosystem
+
+QVL is organized into **four distinct organizations**, each with its own audience and purpose:
+
+| Organization | Audience | In a nutshell |
+|---|---|---|
+| 🎨 **QVL Studio** | General public | Open-source applications, polished and ready to use |
+| 🧰 **QVL Tool Box** | Developers | Reusable services & building blocks |
+| 🎮 **QVL Hobbies** | Everyone *(showcase)* | Personal leisure & hobby apps |
+| 🏠 **QVL CustHome** | Private *(author only)* | Personal, private applications |
+
+### 🎨 QVL Studio
+A collection of **open-source applications aimed at the general public**. These are finished, polished products that anyone can download, use, inspect and learn from. Studio is the public face of QVL's application work — fully open and freely available to all.
+
+### 🧰 QVL Tool Box
+A **toolbox of reusable services and components**. Everything here is built to power QVL's own projects, but is deliberately designed to be **generic and reusable anywhere**. It targets developers who would rather pick up a ready-made building block than reinvent it — shared openly with the wider developer community.
+
+### 🎮 QVL Hobbies
+The home of **personal leisure and hobby applications**. These apps are **visitable by anyone**, but they behave as a **static showcase for the general public** — a curated gallery that **only the author feeds and updates**. Visitors are free to explore and enjoy; the content is driven solely by its creator.
+
+### 🏠 QVL CustHome
+A suite of **strictly personal applications**, built for and **usable only by their author**. CustHome is private by design: it is tailored to individual needs rather than intended for public use.
+
+## 🔀 Storage & mirroring architecture
+
+Every QVL project lives in **two synchronized places**, each with a clear role:
+
+- **🦊 GitLab — private.** The real backbone. This is where **versioning, branches, merge requests and the CI/CD pipelines** happen. It is private, and it is the *single source of truth*.
+- **🐙 GitHub — public.** The **showcase**. It is a **read-only mirror of the `main` branch**, kept automatically in sync. Nothing is ever developed directly on GitHub.
+
+The workflow is straightforward: work happens on **branches in GitLab**, is reviewed through **merge requests**, and once merged into `main`, an automatic **push mirror** replicates `main` to GitHub — so the public showcase always reflects the latest stable state, with **zero manual effort**.
+
+```mermaid
+flowchart LR
+    subgraph GL["🦊 GitLab · private"]
+      direction TB
+      B["feature branches"] -->|Merge Request| M["main"]
+      M --> CI["CI/CD pipelines<br/>build · test · secret scan"]
+    end
+    M -->|"push mirror<br/>main only · automatic"| GH["🐙 GitHub · public<br/>read-only showcase"]
+    style GL fill:#fef3e7,stroke:#fc6d26,color:#000
+    style GH fill:#f2f2f2,stroke:#181717,color:#000
+    style CI fill:#e7f0ff,stroke:#1f6feb,color:#000
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/qvl-studio/Documentation.git
-git branch -M main
-git push -uf origin main
+
+> 💡 **Open source by default** — all code visible on GitHub is, of course, **fully open source**. The public mirror is not just a showcase; it is an open invitation to read, learn from and reuse the work.
+
+## 🤖 Built solo, with agentic AI
+
+Every one of these projects is **developed single-handedly** by its author — a one-person effort spanning the entire ecosystem. This scale is made possible by pairing with **agentic AI (Claude)**, which acts as a tireless engineering partner across design, implementation and review.
+
+## 🔒 Security first
+
+Even as a solo, AI-assisted operation, **security is never an afterthought**:
+
+- 🔍 **Automated secret scanning** — CI/CD pipelines inspect every change *and its full history*, so that **no credential, key or token ever reaches the public showcase**.
+- 🛡️ **Private-by-default source** — real development stays on private GitLab; only the vetted `main` branch is ever mirrored publicly.
+- ✅ **Reviewed & gated changes** — merge requests and pipeline checks guard `main` before anything becomes public.
+
+</details>
+
+<!-- ============================== FRANÇAIS ============================== -->
+<details>
+<summary><h3>🇫🇷&nbsp;&nbsp;Français</h3></summary>
+
+<a id="-français"></a>
+
+## 📖 À propos de ce dépôt
+
+Bienvenue dans le centre de documentation de **QVL**. Ce dépôt a une mission unique : **centraliser la documentation de tous les projets QVL** au même endroit. Plutôt que de laisser la connaissance se disperser dans des dizaines de dépôts, chaque décision d'architecture, guide et référence vit ici — une source de vérité unique et cohérente qui relie tout l'écosystème.
+
+Que tu sois un visiteur curieux, un développeur cherchant à réutiliser un composant, ou simplement en train d'explorer comment les pièces s'assemblent, **c'est ici que tout commence**.
+
+## 🧩 L'écosystème QVL
+
+QVL s'organise en **quatre organisations distinctes**, chacune avec son public et sa vocation :
+
+| Organisation | Public | En bref |
+|---|---|---|
+| 🎨 **QVL Studio** | Grand public | Applications open source, abouties et prêtes à l'emploi |
+| 🧰 **QVL Tool Box** | Développeurs | Services & briques réutilisables |
+| 🎮 **QVL Hobbies** | Tout le monde *(vitrine)* | Applications de loisirs personnelles |
+| 🏠 **QVL CustHome** | Privé *(auteur uniquement)* | Applications personnelles et privées |
+
+### 🎨 QVL Studio
+Un ensemble d'**applications open source destinées au grand public**. Ce sont des produits finis et aboutis que chacun peut télécharger, utiliser, inspecter et dont il peut s'inspirer. Studio est le visage public du travail applicatif de QVL — entièrement ouvert et librement accessible à tous.
+
+### 🧰 QVL Tool Box
+Une **boîte à outils de services et de composants réutilisables**. Tout y est conçu pour alimenter les projets QVL, mais délibérément pensé pour être **générique et réutilisable partout**. Elle s'adresse aux développeurs qui préfèrent réutiliser une brique prête à l'emploi plutôt que de la réinventer — partagée ouvertement avec l'ensemble de la communauté des développeurs.
+
+### 🎮 QVL Hobbies
+Le foyer des **applications de loisirs personnelles**. Ces applications sont **visitables par tout le monde**, mais fonctionnent comme une **vitrine statique pour le grand public** — une galerie soignée **que seul l'auteur alimente et met à jour**. Les visiteurs sont libres d'explorer et d'en profiter ; le contenu est piloté uniquement par son créateur.
+
+### 🏠 QVL CustHome
+Une suite d'**applications strictement personnelles**, conçues pour et **utilisables uniquement par leur auteur**. CustHome est privé par conception : il répond à des besoins individuels plutôt qu'à un usage public.
+
+## 🔀 Architecture de stockage & mise en miroir
+
+Chaque projet QVL vit dans **deux emplacements synchronisés**, chacun avec un rôle bien défini :
+
+- **🦊 GitLab — privé.** La véritable colonne vertébrale. C'est là que se déroulent le **versioning, les branches, les merge requests et les pipelines CI/CD**. Il est privé, et c'est la *source de vérité unique*.
+- **🐙 GitHub — public.** La **vitrine**. C'est un **miroir en lecture seule de la branche `main`**, tenu à jour automatiquement. Rien n'est jamais développé directement sur GitHub.
+
+Le flux est simple : le travail se fait sur des **branches dans GitLab**, est relu via des **merge requests**, et une fois fusionné dans `main`, un **push mirror** automatique réplique `main` vers GitHub — la vitrine publique reflète donc toujours le dernier état stable, **sans aucune manipulation manuelle**.
+
+```mermaid
+flowchart LR
+    subgraph GL["🦊 GitLab · privé"]
+      direction TB
+      B["branches de fonctionnalité"] -->|Merge Request| M["main"]
+      M --> CI["pipelines CI/CD<br/>build · tests · scan de secrets"]
+    end
+    M -->|"push mirror<br/>main uniquement · automatique"| GH["🐙 GitHub · public<br/>vitrine en lecture seule"]
+    style GL fill:#fef3e7,stroke:#fc6d26,color:#000
+    style GH fill:#f2f2f2,stroke:#181717,color:#000
+    style CI fill:#e7f0ff,stroke:#1f6feb,color:#000
 ```
 
-## Integrate with your tools
+> 💡 **Open source par défaut** — tout le code visible sur GitHub est, bien évidemment, **entièrement open source**. Le miroir public n'est pas qu'une vitrine ; c'est une invitation ouverte à lire, comprendre et réutiliser le travail réalisé.
 
-* [Set up project integrations](https://gitlab.com/qvl-studio/Documentation/-/settings/integrations)
+## 🤖 Développé en solo, avec l'IA agentique
 
-## Collaborate with your team
+Chacun de ces projets est **développé seul** par son auteur — un effort d'une seule personne à l'échelle de tout l'écosystème. Cette envergure est rendue possible par le binôme avec une **IA agentique (Claude)**, qui joue le rôle d'un partenaire d'ingénierie infatigable, de la conception à l'implémentation jusqu'à la relecture.
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+## 🔒 La sécurité d'abord
 
-## Test and Deploy
+Même pour une activité solo assistée par IA, **la sécurité n'est jamais une pensée après coup** :
 
-Use the built-in continuous integration in GitLab.
+- 🔍 **Scan de secrets automatisé** — les pipelines CI/CD inspectent chaque changement *et tout son historique*, afin qu'**aucun identifiant, clé ou token n'atteigne jamais la vitrine publique**.
+- 🛡️ **Source privée par défaut** — le développement réel reste sur GitLab privé ; seule la branche `main` validée est mise en miroir publiquement.
+- ✅ **Changements relus et verrouillés** — merge requests et contrôles de pipeline protègent `main` avant toute publication.
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+</details>
 
-***
+---
 
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+<p align="center">
+  <sub>© QVL — Documentation · Source : <a href="https://gitlab.com/qvl-studio/Documentation">GitLab (private)</a> · Showcase : <a href="https://github.com/QVL-Studio/Documentation">GitHub (public)</a></sub><br>
+  <sub>Crafted solo, with the help of agentic AI 🤖 · Conçu en solo, avec l'aide de l'IA agentique</sub>
+</p>
