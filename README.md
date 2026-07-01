@@ -42,7 +42,7 @@ QVL is organized into **four distinct organizations**, each with its own audienc
 | 🎨 **QVL Studio** | General public | Open-source applications, polished and ready to use |
 | 🧰 **QVL Tool Box** | Developers | Reusable services & building blocks |
 | 🎮 **QVL Hobbies** | Everyone *(showcase)* | Personal leisure & hobby apps |
-| 🏠 **QVL CustHome** | Private *(author only)* | Personal, private applications |
+| 🏠 **QVL CustHome** | Everyone *(code)* · author *(instance)* | Open-source code, single-user private instance |
 
 ### 🎨 QVL Studio
 A collection of **open-source applications aimed at the general public**. These are finished, polished products that anyone can download, use, inspect and learn from. Studio is the public face of QVL's application work — fully open and freely available to all.
@@ -54,7 +54,12 @@ A **toolbox of reusable services and components**. Everything here is built to p
 The home of **personal leisure and hobby applications**. These apps are **visitable by anyone**, but they behave as a **static showcase for the general public** — a curated gallery that **only the author feeds and updates**. Visitors are free to explore and enjoy; the content is driven solely by its creator.
 
 ### 🏠 QVL CustHome
-A suite of **strictly personal applications**, built for and **usable only by their author**. CustHome is private by design: it is tailored to individual needs rather than intended for public use.
+Personal applications, tailored to their author's own needs. Here it is essential to draw a clear line between **the code** and **the running instance**:
+
+- **The code is open source.** Exactly like every other QVL project, anyone is free to **fork CustHome and do whatever they want with it** — inspect it, run it, adapt it, build on it.
+- **The author's instance is private.** The live instance is accessible to **its author alone**, simply because he is the *only person with a CustHome account*. Sign-up is **deliberately not open to the general public**, and there is no plan to open it.
+
+In short: **fork it and run your own if you like — but the author's instance stays strictly his.**
 
 ## 🔀 Storage & mirroring architecture
 
@@ -115,7 +120,7 @@ QVL s'organise en **quatre organisations distinctes**, chacune avec son public e
 | 🎨 **QVL Studio** | Grand public | Applications open source, abouties et prêtes à l'emploi |
 | 🧰 **QVL Tool Box** | Développeurs | Services & briques réutilisables |
 | 🎮 **QVL Hobbies** | Tout le monde *(vitrine)* | Applications de loisirs personnelles |
-| 🏠 **QVL CustHome** | Privé *(auteur uniquement)* | Applications personnelles et privées |
+| 🏠 **QVL CustHome** | Tout le monde *(code)* · auteur *(instance)* | Code open source, instance privée mono-utilisateur |
 
 ### 🎨 QVL Studio
 Un ensemble d'**applications open source destinées au grand public**. Ce sont des produits finis et aboutis que chacun peut télécharger, utiliser, inspecter et dont il peut s'inspirer. Studio est le visage public du travail applicatif de QVL — entièrement ouvert et librement accessible à tous.
@@ -127,7 +132,12 @@ Une **boîte à outils de services et de composants réutilisables**. Tout y est
 Le foyer des **applications de loisirs personnelles**. Ces applications sont **visitables par tout le monde**, mais fonctionnent comme une **vitrine statique pour le grand public** — une galerie soignée **que seul l'auteur alimente et met à jour**. Les visiteurs sont libres d'explorer et d'en profiter ; le contenu est piloté uniquement par son créateur.
 
 ### 🏠 QVL CustHome
-Une suite d'**applications strictement personnelles**, conçues pour et **utilisables uniquement par leur auteur**. CustHome est privé par conception : il répond à des besoins individuels plutôt qu'à un usage public.
+Des applications personnelles, taillées pour les besoins propres de leur auteur. Il faut ici bien distinguer **le code** de **l'instance en fonctionnement** :
+
+- **Le code est open source.** Exactement comme tout autre projet QVL, n'importe qui est libre de **forker CustHome et d'en faire ce qu'il veut** — l'inspecter, l'héberger, l'adapter, s'appuyer dessus.
+- **L'instance de l'auteur est privée.** L'instance en production n'est accessible qu'à **son auteur seul**, tout simplement parce qu'il est la *seule personne à disposer d'un compte CustHome*. La création de compte n'est **volontairement pas ouverte au grand public**, et il n'est pas prévu de l'ouvrir.
+
+En résumé : **forkez-le et hébergez le vôtre si vous le souhaitez — mais l'instance de l'auteur reste strictement la sienne.**
 
 ## 🔀 Architecture de stockage & mise en miroir
 
