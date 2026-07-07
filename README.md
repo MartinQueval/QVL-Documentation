@@ -85,6 +85,16 @@ flowchart LR
 
 > 💡 **Open source by default** — all code visible on GitHub is, of course, **fully open source**. The public mirror is not just a showcase; it is an open invitation to read, learn from and reuse the work.
 
+## 📦 Package hosting
+
+Shared packages are distributed through QVL's **private npm registry**:
+
+- **📥 Registry — [`https://npm.qvl-project.com`](https://npm.qvl-project.com) (Verdaccio).** **Anonymous read** (any consumer with a matching `.npmrc` can `npm install`); **publishing is protected** — done only by the package's CI on a `vX.Y.Z` tag, authenticated with `VERDACCIO_TOKEN`.
+- **🎨 Showcase — [`https://canopui.qvl-project.com`](https://canopui.qvl-project.com).** Ladle showcase of the **CanopUI** design system (package `canopui`).
+- **🔗 Known consumers.** The **four CustHome portals** (Authenticator, Admin, Drive, Budgy) consume `canopui`, each pinning an **exact** version in its `package.json`.
+
+> 🗓️ **Decision (2026-07-07, SCRUM-304 / SCRUM-305)** — the `canopui` design system is published on the private Verdaccio registry (anonymous read); the four CustHome portals switched to the hosted `canopui@1.0.1` package (no more locally-built UI library).
+
 ## 🤖 Built solo, with agentic AI
 
 Every one of these projects is **developed single-handedly** by its author — a one-person effort spanning the entire ecosystem. This scale is made possible by pairing with **agentic AI (Claude)**, which acts as a tireless engineering partner across design, implementation and review.
@@ -162,6 +172,16 @@ flowchart LR
 ```
 
 > 💡 **Open source par défaut** — tout le code visible sur GitHub est, bien évidemment, **entièrement open source**. Le miroir public n'est pas qu'une vitrine ; c'est une invitation ouverte à lire, comprendre et réutiliser le travail réalisé.
+
+## 📦 Hébergement des packages
+
+Les packages partagés sont distribués via le **registry npm privé** de QVL :
+
+- **📥 Registry — [`https://npm.qvl-project.com`](https://npm.qvl-project.com) (Verdaccio).** **Lecture anonyme** (tout consommateur avec le bon `.npmrc` peut faire `npm install`) ; **publication protégée** — réalisée uniquement par la CI du package sur un tag `vX.Y.Z`, authentifiée par `VERDACCIO_TOKEN`.
+- **🎨 Vitrine — [`https://canopui.qvl-project.com`](https://canopui.qvl-project.com).** Vitrine Ladle du design system **CanopUI** (package `canopui`).
+- **🔗 Consommateurs connus.** Les **quatre portails CustHome** (Authenticator, Admin, Drive, Budgy) consomment `canopui`, chacun épinglant une version **exacte** dans son `package.json`.
+
+> 🗓️ **Décision (2026-07-07, SCRUM-304 / SCRUM-305)** — le design system `canopui` est publié sur le registry Verdaccio privé (lecture anonyme) ; les quatre portails CustHome ont basculé sur le package hébergé `canopui@1.0.1` (plus de librairie UI buildée localement).
 
 ## 🤖 Développé en solo, avec l'IA agentique
 
