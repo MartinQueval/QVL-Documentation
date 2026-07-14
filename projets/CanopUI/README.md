@@ -72,7 +72,7 @@ flowchart LR
 
 - [Guide d'hébergement](../../hebergement/README.md)
 - [Pipeline CI/CD](../../pipeline/README.md)
-- Dépôt miroir : <https://github.com/QVL-Studio/CanopUI>
+- Dépôt miroir : <https://github.com/MartinQueval/QVL-CanopUI>
 
 ---
 
