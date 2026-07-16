@@ -1,0 +1,803 @@
+openapi: 3.0.3
+info:
+  title: CH-Api-Authenticator
+  description: >-
+    Microservice d'authentification multi-portail de l'écosystème CustHome.
+    Gestion des comptes, rôles par portail, JWT HS256, sessions et administration.
+  version: 0.1.0
+servers:
+  - url: http://localhost:8181/v1
+    description: Accès direct (préfixe versionné)
+  - url: http://localhost:8180/api/auth
+    description: Via la Gateway (routes publiques, strip_prefix)
+  - url: http://localhost:8180/api/admin
+    description: Via la Gateway (routes d'administration)
+tags:
+  - name: Authentification
+  - name: Profil
+  - name: Administration
+  - name: Opérationnel
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    internalSecret:
+      type: apiKey
+      in: header
+      name: x-internal-secret
+  responses:
+    BadRequest:
+      description: Requête invalide
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Non authentifié
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Accès refusé
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflit
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: Trop de requêtes
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: bad_request
+        message:
+          type: string
+      required: [error, message]
+    RegisterRequest:
+      type: object
+      required: [name, email, password, accepted_terms_version]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        accepted_terms_version:
+          type: string
+          example: v1
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    Session:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          example: 900
+    ValidateResponse:
+      type: object
+      properties:
+        user_id:
+          type: string
+        role:
+          type: string
+    Profile:
+      type: object
+      properties:
+        user_id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [pending_validation, active, disabled]
+        whitelist_only:
+          type: boolean
+        allowed_ips:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+    UserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/Profile'
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        portal:
+          type: string
+          enum: [admin, drive, home, budgy]
+        kind:
+          type: string
+          enum: [portal, sub]
+        created_at:
+          type: string
+          format: date-time
+    ResolveRequest:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+    ResolvedUser:
+      type: object
+      properties:
+        user_id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+paths:
+  /register:
+    post:
+      tags: [Authentification]
+      summary: Inscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Compte créé (en attente de validation)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id:
+                    type: string
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422':
+          description: CGU non acceptées ou version obsolète
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /login:
+    post:
+      tags: [Authentification]
+      summary: Connexion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Session créée (JWT + cookies HttpOnly)
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: ch_token et ch_refresh (HttpOnly)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /refresh:
+    post:
+      tags: [Authentification]
+      summary: Rotation du refresh token
+      description: Le refresh token est lu dans le cookie ch_refresh.
+      responses:
+        '200':
+          description: Nouvelle session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /logout:
+    post:
+      tags: [Authentification]
+      summary: Déconnexion
+      responses:
+        '200':
+          description: Déconnecté (cookies expirés, famille révoquée)
+  /validate:
+    get:
+      tags: [Authentification]
+      summary: Validation du token pour la Gateway
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: X-Portal
+          required: true
+          schema:
+            type: string
+            example: portail_drive
+        - in: header
+          name: X-Client-IP
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Token valide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidateResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /password:
+    put:
+      tags: [Authentification]
+      summary: Changement de mot de passe
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password:
+                  type: string
+                new_password:
+                  type: string
+      responses:
+        '200':
+          description: Mot de passe changé
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /password/forgot:
+    post:
+      tags: [Authentification]
+      summary: Demande de réinitialisation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '202':
+          description: Accepté (réponse identique que le compte existe ou non)
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /password/reset:
+    post:
+      tags: [Authentification]
+      summary: Réinitialisation via token one-time
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token:
+                  type: string
+                new_password:
+                  type: string
+      responses:
+        '200':
+          description: Mot de passe réinitialisé
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /me:
+    get:
+      tags: [Profil]
+      summary: Profil courant
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [Profil]
+      summary: Mise à jour de l'email
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Profil mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /settings/registration:
+    get:
+      tags: [Administration]
+      summary: État de l'inscription publique
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: État
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+    put:
+      tags: [Administration]
+      summary: Activer/désactiver l'inscription
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Réglage mis à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+  /users:
+    get:
+      tags: [Administration]
+      summary: Liste paginée des comptes
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20, maximum: 100 }
+        - in: query
+          name: email
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, disabled, pending_validation, pending] }
+      responses:
+        '200':
+          description: Liste
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /users/pending:
+    get:
+      tags: [Administration]
+      summary: Comptes en attente de validation
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        '200':
+          description: Liste
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+  /users/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Administration]
+      summary: Détail d'un compte
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Administration]
+      summary: Mise à jour nom + email
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Profil mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Administration]
+      summary: Suppression d'un compte
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Compte supprimé
+        '404': { $ref: '#/components/responses/NotFound' }
+  /users/{id}/status:
+    put:
+      tags: [Administration]
+      summary: Changement de statut
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [pending_validation, active, disabled]
+      responses:
+        '200':
+          description: Profil mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /users/{id}/password:
+    put:
+      tags: [Administration]
+      summary: Réinitialisation du mot de passe (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+      responses:
+        '204':
+          description: Mot de passe réinitialisé
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /users/{id}/roles:
+    put:
+      tags: [Administration]
+      summary: Remplacement des rôles
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roles]
+              properties:
+                roles:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Profil mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /users/{id}/whitelist:
+    put:
+      tags: [Administration]
+      summary: Configuration de la whitelist IP
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [whitelist_only]
+              properties:
+                whitelist_only:
+                  type: boolean
+                allowed_ips:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Profil mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /analytics/traffic:
+    get:
+      tags: [Administration]
+      summary: Trafic par portail
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: period
+          schema:
+            type: string
+            enum: [day, week, month, year]
+            default: week
+      responses:
+        '200':
+          description: Statistiques de trafic
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period:
+                    type: string
+                  registrations:
+                    type: integer
+                  portals:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        portal:
+                          type: string
+                        connected_users:
+                          type: integer
+  /roles:
+    get:
+      tags: [Administration]
+      summary: Catalogue des rôles
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Liste des rôles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+    post:
+      tags: [Administration]
+      summary: Création d'un sous-rôle de portail
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, portal]
+              properties:
+                name:
+                  type: string
+                portal:
+                  type: string
+                  enum: [admin, drive, home, budgy]
+      responses:
+        '201':
+          description: Rôle créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /roles/{id}:
+    delete:
+      tags: [Administration]
+      summary: Suppression d'un sous-rôle
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Rôle supprimé
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /health:
+    servers:
+      - url: http://localhost:8181
+    get:
+      tags: [Opérationnel]
+      summary: État du service
+      responses:
+        '200':
+          description: État
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  version:
+                    type: string
+                  mongodb:
+                    type: string
+  /ping:
+    servers:
+      - url: http://localhost:8181
+    get:
+      tags: [Opérationnel]
+      summary: Route témoin
+      responses:
+        '200':
+          description: pong
+  /internal/users/resolve:
+    servers:
+      - url: http://localhost:8181
+    post:
+      tags: [Opérationnel]
+      summary: Résolution d'identités (inter-services)
+      security:
+        - internalSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveRequest'
+      responses:
+        '200':
+          description: Identités résolues
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResolvedUser'
+        '403': { $ref: '#/components/responses/Forbidden' }

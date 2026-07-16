@@ -1,0 +1,453 @@
+openapi: 3.0.3
+info:
+  title: CH-Api-Budgy
+  description: >-
+    Microservice Budgy CustHome : budget personnel avec agrégation bancaire
+    (consentements, comptes, soldes, transactions).
+  version: 0.1.0
+servers:
+  - url: http://localhost:8183/v1
+    description: Accès direct
+  - url: http://localhost:8180/api/budgy/v1
+    description: Via la Gateway
+tags:
+  - name: Profil
+  - name: Comptes
+  - name: Banques
+  - name: Consentements
+  - name: Opérationnel
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    BadRequest:
+      description: Requête invalide
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Non authentifié
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Accès refusé (rôle budgy requis)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflit
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BankUnavailable:
+      description: Source bancaire indisponible
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required: [code, message]
+    MeResponse:
+      type: object
+      properties:
+        owner_id:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+    Balance:
+      type: object
+      properties:
+        amount_cents:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum: [available, booked, expected]
+        at:
+          type: string
+          format: date-time
+    BankAccountSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        iban_masked:
+          type: string
+        currency:
+          type: string
+        balance:
+          allOf:
+            - $ref: '#/components/schemas/Balance'
+          nullable: true
+    BankAccount:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        iban_masked:
+          type: string
+        currency:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    BankTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        amount_cents:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [booked, pending]
+        booking_date:
+          type: string
+          format: date
+          nullable: true
+        value_date:
+          type: string
+          format: date
+          nullable: true
+    Bank:
+      type: object
+      properties:
+        id:
+          type: string
+        nom:
+          type: string
+        pays:
+          type: string
+    Consent:
+      type: object
+      properties:
+        consent_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, active, expired, revoked, failed]
+        renewal:
+          type: string
+          enum: [up-to-date, renewal-required, expired]
+        renewable:
+          type: boolean
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateConsentRequest:
+      type: object
+      required: [bank_id]
+      properties:
+        bank_id:
+          type: string
+    CreateConsentResponse:
+      type: object
+      properties:
+        consent_id:
+          type: string
+          format: uuid
+        authorization_url:
+          type: string
+    ConsentCallbackRequest:
+      type: object
+      required: [code, state]
+      properties:
+        code:
+          type: string
+        state:
+          type: string
+    ConsentCompletion:
+      type: object
+      properties:
+        consent_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, active, expired, revoked, failed]
+        comptes:
+          type: array
+          items:
+            $ref: '#/components/schemas/BankAccount'
+    RenewConsentResponse:
+      type: object
+      properties:
+        consent_id:
+          type: string
+          format: uuid
+        authorization_url:
+          type: string
+    AccountList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BankAccountSummary'
+        total:
+          type: integer
+          format: int64
+    TransactionList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BankTransaction'
+        total:
+          type: integer
+          format: int64
+    BankList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Bank'
+        total:
+          type: integer
+          format: int64
+    ConsentList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Consent'
+        total:
+          type: integer
+          format: int64
+  parameters:
+    Limit:
+      in: query
+      name: limit
+      schema:
+        type: integer
+        default: 50
+        maximum: 200
+    Offset:
+      in: query
+      name: offset
+      schema:
+        type: integer
+        default: 0
+paths:
+  /me:
+    get:
+      tags: [Profil]
+      summary: Identité du propriétaire courant
+      responses:
+        '200':
+          description: Identité
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /accounts:
+    get:
+      tags: [Comptes]
+      summary: Liste des comptes avec solde
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Comptes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountList'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /accounts/{account_id}:
+    get:
+      tags: [Comptes]
+      summary: Détail d'un compte
+      parameters:
+        - in: path
+          name: account_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Compte
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BankAccountSummary'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /accounts/{account_id}/transactions:
+    get:
+      tags: [Comptes]
+      summary: Transactions d'un compte
+      parameters:
+        - in: path
+          name: account_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionList'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /banks:
+    get:
+      tags: [Banques]
+      summary: Établissements bancaires disponibles
+      responses:
+        '200':
+          description: Banques
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BankList'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /consents:
+    get:
+      tags: [Consentements]
+      summary: Liste des consentements
+      responses:
+        '200':
+          description: Consentements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentList'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Consentements]
+      summary: Initier un consentement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConsentRequest'
+      responses:
+        '200':
+          description: Consentement initié
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateConsentResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '502': { $ref: '#/components/responses/BankUnavailable' }
+  /consents/callback:
+    post:
+      tags: [Consentements]
+      summary: Finaliser un consentement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentCallbackRequest'
+      responses:
+        '200':
+          description: Consentement finalisé (comptes enregistrés)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentCompletion'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BankUnavailable' }
+  /consents/{consent_id}/renew:
+    post:
+      tags: [Consentements]
+      summary: Renouveler un consentement
+      parameters:
+        - in: path
+          name: consent_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Renouvellement initié
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RenewConsentResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BankUnavailable' }
+  /health:
+    servers:
+      - url: http://localhost:8183
+    get:
+      tags: [Opérationnel]
+      summary: État du service
+      security: []
+      responses:
+        '200':
+          description: État
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string

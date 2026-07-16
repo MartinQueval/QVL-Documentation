@@ -1,0 +1,728 @@
+openapi: 3.0.3
+info:
+  title: CH-Api-Drive
+  description: >-
+    Microservice Drive CustHome : fichiers arborescents, galerie média, corbeille,
+    upload direct et par chunks, quotas et administration.
+  version: 0.1.0
+servers:
+  - url: http://localhost:8182/v1
+    description: Accès direct
+  - url: http://localhost:8180/api/drive/v1
+    description: Via la Gateway
+tags:
+  - name: Stockage
+  - name: Fichiers
+  - name: Corbeille
+  - name: Upload
+  - name: Administration
+  - name: Opérationnel
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    BadRequest:
+      description: Requête invalide
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Non authentifié
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Accès refusé
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflit
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PayloadTooLarge:
+      description: Quota dépassé ou corps trop volumineux
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error, message]
+    Node:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        kind:
+          type: string
+          enum: [folder, file]
+        name:
+          type: string
+        mime:
+          type: string
+          nullable: true
+        size_bytes:
+          type: integer
+          format: int64
+        is_media:
+          type: boolean
+        media_type:
+          type: string
+          enum: [image, video]
+          nullable: true
+        width:
+          type: integer
+          nullable: true
+        height:
+          type: integer
+          nullable: true
+        duration_ms:
+          type: integer
+          nullable: true
+        has_thumbnail:
+          type: boolean
+        taken_at:
+          type: string
+          format: date-time
+          nullable: true
+        trashed:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Crumb:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    ListResponse:
+      type: object
+      properties:
+        parent_id:
+          type: string
+          format: uuid
+        ancestors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Crumb'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Node'
+    StorageResponse:
+      type: object
+      properties:
+        quota_bytes:
+          type: integer
+          format: int64
+        used_bytes:
+          type: integer
+          format: int64
+    CreateFolderBody:
+      type: object
+      required: [name]
+      properties:
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+    PatchBody:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+    OpenUploadBody:
+      type: object
+      required: [file_name, declared_size, chunk_size]
+      properties:
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        file_name:
+          type: string
+        declared_size:
+          type: integer
+          format: int64
+        chunk_size:
+          type: integer
+        declared_mime:
+          type: string
+          nullable: true
+        checksum:
+          type: string
+          nullable: true
+    UploadSession:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        parent_id:
+          type: string
+          format: uuid
+        file_name:
+          type: string
+        declared_size:
+          type: integer
+          format: int64
+        reserved_bytes:
+          type: integer
+          format: int64
+        chunk_size:
+          type: integer
+        chunk_count:
+          type: integer
+        state:
+          type: string
+          enum: [open, completing, completed, aborted]
+        received_bytes:
+          type: integer
+          format: int64
+        expires_at:
+          type: string
+          format: date-time
+    PutChunkResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        chunk_index:
+          type: integer
+        received_bytes:
+          type: integer
+          format: int64
+        declared_size:
+          type: integer
+          format: int64
+    AdminUserView:
+      type: object
+      properties:
+        user_id:
+          type: string
+        quota_bytes:
+          type: integer
+          format: int64
+        used_bytes:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        name:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+    DriveUserAdmin:
+      type: object
+      properties:
+        user_id:
+          type: string
+        quota_bytes:
+          type: integer
+          format: int64
+        used_bytes:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+paths:
+  /me/storage:
+    get:
+      tags: [Stockage]
+      summary: Quota et usage
+      responses:
+        '200':
+          description: Quota et usage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorageResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /files:
+    get:
+      tags: [Fichiers]
+      summary: Liste le contenu d'un dossier
+      parameters:
+        - in: query
+          name: parent
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Contenu du dossier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Fichiers]
+      summary: Upload direct multipart
+      parameters:
+        - in: query
+          name: parent
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Fichier créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+  /files/{id}/content:
+    get:
+      tags: [Fichiers]
+      summary: Téléchargement du contenu
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: header
+          name: Range
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Contenu complet
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: Contenu partiel (Range)
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '416':
+          description: Range non satisfaisable
+  /files/{id}/thumbnail:
+    get:
+      tags: [Fichiers]
+      summary: Vignette JPEG
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Vignette
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /gallery:
+    get:
+      tags: [Fichiers]
+      summary: Liste des médias
+      responses:
+        '200':
+          description: Médias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Node'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /search:
+    get:
+      tags: [Fichiers]
+      summary: Recherche par nom
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Résultats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Node'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /duplicates:
+    get:
+      tags: [Fichiers]
+      summary: Fichiers en doublon
+      responses:
+        '200':
+          description: Doublons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Node'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /folders:
+    post:
+      tags: [Fichiers]
+      summary: Création d'un dossier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFolderBody'
+      responses:
+        '201':
+          description: Dossier créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /nodes/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      tags: [Fichiers]
+      summary: Renommer et/ou déplacer un nœud
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchBody'
+      responses:
+        '200':
+          description: Nœud mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Fichiers]
+      summary: Suppression définitive
+      responses:
+        '204':
+          description: Nœud supprimé
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /nodes/{id}/trash:
+    post:
+      tags: [Corbeille]
+      summary: Mise en corbeille
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Mis en corbeille
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /nodes/{id}/restore:
+    post:
+      tags: [Corbeille]
+      summary: Restauration depuis la corbeille
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Restauré
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /trash:
+    get:
+      tags: [Corbeille]
+      summary: Contenu de la corbeille
+      responses:
+        '200':
+          description: Éléments en corbeille
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Node'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /trash/purge:
+    post:
+      tags: [Corbeille]
+      summary: Vidage définitif de la corbeille
+      responses:
+        '204':
+          description: Corbeille vidée
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /uploads:
+    post:
+      tags: [Upload]
+      summary: Ouverture d'une session d'upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenUploadBody'
+      responses:
+        '201':
+          description: Session créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSession'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+  /uploads/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Upload]
+      summary: État d'une session
+      responses:
+        '200':
+          description: Session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSession'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Upload]
+      summary: Annulation d'une session
+      responses:
+        '204':
+          description: Session annulée
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /uploads/{id}/chunks/{index}:
+    put:
+      tags: [Upload]
+      summary: Envoi d'un chunk
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: index
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Chunk enregistré
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PutChunkResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+  /uploads/{id}/complete:
+    post:
+      tags: [Upload]
+      summary: Finalisation de l'upload
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Fichier matérialisé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /admin/users:
+    get:
+      tags: [Administration]
+      summary: Liste des utilisateurs Drive
+      responses:
+        '200':
+          description: Utilisateurs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminUserView'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/users/{id}:
+    patch:
+      tags: [Administration]
+      summary: Modification du quota
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quota_bytes]
+              properties:
+                quota_bytes:
+                  type: integer
+                  format: int64
+      responses:
+        '200':
+          description: Quota mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriveUserAdmin'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/users/{id}/recompute:
+    post:
+      tags: [Administration]
+      summary: Recalcul de l'usage
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Usage recalculé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriveUserAdmin'
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /health:
+    servers:
+      - url: http://localhost:8182
+    get:
+      tags: [Opérationnel]
+      summary: État du service
+      security: []
+      responses:
+        '200':
+          description: État
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string

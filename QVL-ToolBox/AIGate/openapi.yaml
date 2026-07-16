@@ -1,0 +1,428 @@
+openapi: 3.0.3
+info:
+  title: AIGate
+  description: >-
+    Passerelle IA compatible avec l'API OpenAI. Les applications parlent le
+    format chat-completions d'OpenAI ; AIGate traduit vers OpenAI, Gemini,
+    Claude ou Mistral et normalise la réponse. Le moteur est choisi par un
+    préfixe provider/model ou par l'en-tête X-AI-Provider. Les clés d'API sont
+    transmises par requête et jamais stockées.
+  version: 0.1.0
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:8080
+    description: Démon local
+security:
+  - ProviderKey: []
+    AIGateKey: []
+tags:
+  - name: health
+  - name: chat
+  - name: models
+  - name: usage
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Sonde de disponibilité
+      description: Toujours ouvert, sans authentification.
+      security: []
+      responses:
+        "200":
+          description: Service vivant
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+  /v1/models:
+    get:
+      tags: [models]
+      summary: Liste des modèles
+      description: >-
+        Liste agrégée par moteur, ids préfixés provider/model. Liste live si
+        une clé est disponible pour le moteur, sinon catalogue intégré.
+      parameters:
+        - name: provider
+          in: query
+          required: false
+          description: Filtre sur un seul moteur.
+          schema:
+            type: string
+            enum: [openai, mistral, claude, gemini]
+      responses:
+        "200":
+          description: Liste des modèles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelList"
+        "400":
+          description: Moteur inconnu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Clé AIGate absente ou invalide (si l'auth est active)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Limite de requêtes atteinte
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitError"
+  /v1/usage:
+    get:
+      tags: [usage]
+      summary: Métriques d'usage et de coût
+      responses:
+        "200":
+          description: Totaux, statistiques de cache et détail par app/provider/model
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageReport"
+        "401":
+          description: Clé AIGate absente ou invalide (si l'auth est active)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Limite de requêtes atteinte
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitError"
+  /v1/chat/completions:
+    post:
+      tags: [chat]
+      summary: Complétion de chat
+      description: >-
+        Corps au schéma OpenAI chat-completions plus l'extension fallbacks. En
+        streaming (stream=true), la réponse est un flux SSE d'événements
+        chat.completion.chunk terminé par data: [DONE].
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+      responses:
+        "200":
+          description: Complétion (JSON) ou flux SSE si stream=true
+          headers:
+            X-AI-Cache:
+              description: HIT ou MISS sur les réponses non streamées
+              schema:
+                type: string
+                enum: [HIT, MISS]
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletion"
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: Corps invalide, aucune cible utilisable, ou chaîne interrompue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FailoverError"
+        "401":
+          description: Clé AIGate absente ou invalide (si l'auth est active)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Limite de requêtes atteinte
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitError"
+        "502":
+          description: Tous les moteurs de la chaîne ont échoué
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FailoverError"
+components:
+  securitySchemes:
+    ProviderKey:
+      type: http
+      scheme: bearer
+      description: Clé d'API du fournisseur, transmise telle quelle et jamais stockée.
+    AIGateKey:
+      type: apiKey
+      in: header
+      name: X-AIGate-Key
+      description: Clé AIGate, requise sur /v1/* quand AIGATE_KEYS est défini.
+  schemas:
+    ModelList:
+      type: object
+      properties:
+        object:
+          type: string
+          example: list
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Model"
+    Model:
+      type: object
+      properties:
+        id:
+          type: string
+          example: openai/gpt-4o-mini
+        object:
+          type: string
+          example: model
+        owned_by:
+          type: string
+          example: openai
+    ChatRequest:
+      type: object
+      required: [model, messages]
+      properties:
+        model:
+          type: string
+          description: provider/model, par exemple openai/gpt-4o-mini.
+          example: openai/gpt-4o-mini
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        temperature:
+          type: number
+          format: float
+          nullable: true
+        max_tokens:
+          type: integer
+          format: int32
+          nullable: true
+        stream:
+          type: boolean
+          default: false
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tool"
+        tool_choice:
+          description: Valeur tool_choice OpenAI (auto, required, none, ou un objet).
+        fallbacks:
+          type: array
+          description: Extension AIGate, cibles provider/model essayées dans l'ordre.
+          items:
+            type: string
+    Message:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant, tool]
+        content:
+          $ref: "#/components/schemas/Content"
+        tool_calls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolCall"
+        tool_call_id:
+          type: string
+        name:
+          type: string
+    Content:
+      description: Chaîne simple ou tableau de parts multimodales.
+      oneOf:
+        - type: string
+        - type: array
+          items:
+            $ref: "#/components/schemas/ContentPart"
+    ContentPart:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [text, image_url]
+        text:
+          type: string
+        image_url:
+          $ref: "#/components/schemas/ImageUrl"
+    ImageUrl:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: "URL http(s) ou data: base64."
+        detail:
+          type: string
+    Tool:
+      type: object
+      required: [function]
+      properties:
+        type:
+          type: string
+          default: function
+        function:
+          $ref: "#/components/schemas/FunctionDef"
+    FunctionDef:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        parameters:
+          type: object
+          description: JSON Schema des paramètres.
+    ToolCall:
+      type: object
+      required: [function]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          default: function
+        function:
+          $ref: "#/components/schemas/FunctionCall"
+    FunctionCall:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        arguments:
+          type: string
+          description: Arguments encodés en JSON (chaîne, convention OpenAI).
+    ChatCompletion:
+      type: object
+      properties:
+        object:
+          type: string
+          example: chat.completion
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              message:
+                $ref: "#/components/schemas/Message"
+              finish_reason:
+                type: string
+                nullable: true
+        usage:
+          $ref: "#/components/schemas/Usage"
+    Usage:
+      type: object
+      nullable: true
+      properties:
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        total_tokens:
+          type: integer
+    UsageReport:
+      type: object
+      properties:
+        totals:
+          type: object
+          properties:
+            requests:
+              type: integer
+            prompt_tokens:
+              type: integer
+            completion_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+            cost_usd:
+              type: number
+        cache:
+          type: object
+          properties:
+            hits:
+              type: integer
+            misses:
+              type: integer
+            entries:
+              type: integer
+            capacity:
+              type: integer
+        by:
+          type: array
+          items:
+            type: object
+            properties:
+              app:
+                type: string
+              provider:
+                type: string
+              model:
+                type: string
+              requests:
+                type: integer
+              prompt_tokens:
+                type: integer
+              completion_tokens:
+                type: integer
+              total_tokens:
+                type: integer
+              cost_usd:
+                type: number
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+    RateLimitError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: rate limit exceeded
+            retry_after:
+              type: integer
+              description: Secondes avant nouvelle tentative.
+    FailoverError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            attempts:
+              type: array
+              items:
+                type: object
+                properties:
+                  provider:
+                    type: string
+                  model:
+                    type: string
+                  tries:
+                    type: integer
+                  error:
+                    type: string

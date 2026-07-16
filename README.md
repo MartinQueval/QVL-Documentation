@@ -61,6 +61,18 @@ Personal applications, tailored to their author's own needs. Here it is essentia
 
 In short: **fork it and run your own if you like — but the author's instance stays strictly his.**
 
+## 🗂️ Documentation map
+
+| Area | Documentation |
+|---|---|
+| 🎨 CanopUI — shared design system | [QVL-CanopUI](QVL-CanopUI/README.md) |
+| 🚪 ProjectCenter — entry portal | [QVL-ProjectCenter](QVL-ProjectCenter/README.md) |
+| 🧩 QVL-Studio — dev meta-workspace | [QVL-Studio](QVL-Studio/README.md) |
+| 🏠 QVL CustHome | [QVL-CustHome](QVL-CustHome/README.md) |
+| 🧰 QVL Tool Box | [QVL-ToolBox](QVL-ToolBox/README.md) |
+| 🦊 Hosting & infrastructure | [hebergement](hebergement/README.md) |
+| 🔄 CI/CD pipeline | [pipeline](pipeline/README.md) |
+
 ## 🔀 Storage & mirroring architecture
 
 Every QVL project lives in **two synchronized places**, each with a clear role:
@@ -148,6 +160,18 @@ Des applications personnelles, taillées pour les besoins propres de leur auteur
 - **L'instance de l'auteur est privée.** L'instance en production n'est accessible qu'à **son auteur seul**, tout simplement parce qu'il est la *seule personne à disposer d'un compte CustHome*. La création de compte n'est **volontairement pas ouverte au grand public**, et il n'est pas prévu de l'ouvrir.
 
 En résumé : **forkez-le et hébergez le vôtre si vous le souhaitez — mais l'instance de l'auteur reste strictement la sienne.**
+
+## 🗂️ Cartographie de la documentation
+
+| Domaine | Documentation |
+|---|---|
+| 🎨 CanopUI — design system partagé | [QVL-CanopUI](QVL-CanopUI/README.md) |
+| 🚪 ProjectCenter — portail d'entrée | [QVL-ProjectCenter](QVL-ProjectCenter/README.md) |
+| 🧩 QVL-Studio — méta-workspace de dev | [QVL-Studio](QVL-Studio/README.md) |
+| 🏠 QVL CustHome | [QVL-CustHome](QVL-CustHome/README.md) |
+| 🧰 QVL Tool Box | [QVL-ToolBox](QVL-ToolBox/README.md) |
+| 🦊 Hébergement & infrastructure | [hebergement](hebergement/README.md) |
+| 🔄 Pipeline CI/CD | [pipeline](pipeline/README.md) |
 
 ## 🔀 Architecture de stockage & mise en miroir
 

@@ -2,77 +2,44 @@
 
 <img src="logo.png" alt="Logo CanopUI" width="64" height="64" />
 
-![version](https://img.shields.io/badge/version-1.4.0-blue) ![licence](https://img.shields.io/badge/licence-MIT-green) ![build](https://img.shields.io/badge/build-passing-brightgreen)
+![package](https://img.shields.io/badge/package-canopui-cb3837) ![version](https://img.shields.io/badge/version-1.1.1-blue) ![registry](https://img.shields.io/badge/registry-npm.qvl--project.com-4b5e40)
 
 > Design system React de la flotte **QVL**, socle commun de tous les portails.
 
-CanopUI fournit un ensemble de composants accessibles, typés en TypeScript strict et construits au-dessus de MUI. La librairie est distribuée via Verdaccio et consommée par les portails (ProjectCenter, Budgy, etc.).
+CanopUI est la librairie de composants React partagée de l'écosystème QVL-Studio. C'est un **wrapper au-dessus de MUI** (les portails n'importent jamais MUI directement), typé en TypeScript strict, avec thème clair/sombre au runtime et design tokens exposés en CSS variables `--ch-*`. Fork indépendant de **CH-UI-Library v0.7.0** (QVL-CustHome). Distribuée via le registre npm privé **Verdaccio** (`npm.qvl-project.com`) et présentée dans une vitrine **Ladle** sur [canopui.qvl-project.com](https://canopui.qvl-project.com).
 
 ## Sommaire
 
 - [Installation](#installation)
-- [Composants](#composants)
-- [Feuille de route](#feuille-de-route)
-- [Architecture](#architecture)
+- [En bref](#en-bref)
+- [Documentation complète](#documentation-complète)
 
 ## Installation
 
 ```bash
+echo "registry=https://npm.qvl-project.com/" > .npmrc
 npm install canopui
 ```
 
-Pour un développement local sur un portail consommateur, la librairie peut être packagée en tarball :
+Les consommateurs épinglent la version en **exact**. La publication est automatique via la CI sur un tag `vX.Y.Z`.
 
-```bash
-npm run build && npm pack
-```
+## En bref
 
-## Composants
+- **Composants** : boutons, champs de saisie & formulaires, structure de page (`Layout`, `PageScaffold`, `Navbar`…), `Card`, `DataTable`, `Carousel`, feedback (`Toast`, `Feedback`, `Spinner`), upload de fichiers, et plus.
+- **Thème** : `ChThemeProvider` + hook `useChTheme()` (clair/sombre/système, persistance `localStorage`).
+- **i18n** : `ChI18nProvider` + `useTranslation` (fr/en au runtime).
 
-| Composant   | Statut       | Depuis  | Accessibilité |
-|-------------|--------------|---------|---------------|
-| Button      | Stable       | 0.1.0   | AAA           |
-| Navbar      | Stable       | 0.9.0   | AA            |
-| Carousel    | Bêta         | 1.4.0   | AA            |
-| Collapse    | Stable       | 1.1.0   | AA            |
-| DataTable   | Expérimental | 1.4.0   | En cours      |
+## Documentation complète
 
-## Feuille de route
+La documentation de référence — rôle, installation, liste exhaustive des composants exportés, theming, versioning/release et sécurité CI — est ici :
 
-- [x] Thème clair / sombre
-- [x] Composant Carousel
-- [ ] Tokens de design exportables en CSS variables
-- [ ] Mode RTL complet
-- [ ] Documentation interactive (Storybook)
-
-## Architecture
-
-Le diagramme ci-dessous décrit la circulation des tokens de design vers les composants.
-
-```mermaid
-flowchart LR
-    Tokens[Design Tokens] --> Theme[ThemeProvider]
-    Theme --> Base[Composants de base]
-    Theme --> Patterns[Patterns composites]
-    Base --> Portails
-    Patterns --> Portails[Portails QVL]
-```
-
-<details>
-<summary>Conventions de contribution (cliquer pour déplier)</summary>
-
-- Une branche par feature : `feat/SCRUM-XXX-<desc>`
-- Aucun commentaire dans le code : le code doit être auto-explicatif
-- Séparation logique / présentation via hooks
-- Tests obligatoires sur les composants exportés
-
-</details>
+**→ [Documentation CanopUI](../../QVL-CanopUI/README.md)**
 
 ## Liens utiles
 
 - [Guide d'hébergement](../../hebergement/README.md)
 - [Pipeline CI/CD](../../pipeline/README.md)
-- Dépôt miroir : <https://github.com/MartinQueval/QVL-CanopUI>
+- Dépôt miroir : <https://github.com/QVL-Studio/CanopUI>
 
 ---
 

@@ -1,0 +1,131 @@
+openapi: 3.0.3
+info:
+  title: Missive
+  description: >-
+    Mailer transactionnel générique et auto-hébergeable. Achemine un message
+    vers un serveur SMTP sans logique métier ni templating. L'expéditeur est
+    fixé côté serveur. Seul le canal email est opérationnel ; le canal push est
+    réservé et répond 501.
+  version: 0.1.0
+  license:
+    name: MIT
+servers:
+  - url: http://127.0.0.1:8184
+    description: Démon local (bind loopback par défaut)
+tags:
+  - name: health
+  - name: send
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Sonde de disponibilité
+      description: Aucune authentification, répond toujours 200.
+      security: []
+      responses:
+        "200":
+          description: Service vivant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /v1/send:
+    post:
+      tags: [send]
+      summary: Envoi d'un message
+      description: >-
+        Requiert le header x-internal-secret. Corps limité à 512 Ko. Les
+        erreurs applicatives ont un corps vide ; les rejets du framework
+        (JSON malformé, 413, 415, 422) renvoient un corps text/plain.
+      security:
+        - InternalSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendRequest"
+      responses:
+        "200":
+          description: Message accepté et transmis au serveur SMTP
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendResponse"
+        "400":
+          description: >-
+            Payload invalide (validation applicative) ou JSON syntaxiquement
+            invalide. Corps vide pour la validation applicative.
+        "401":
+          description: Header x-internal-secret absent, vide ou incorrect (corps vide)
+        "413":
+          description: Corps au-delà de 512 Ko
+          content:
+            text/plain:
+              schema:
+                type: string
+        "415":
+          description: content-type absent ou différent de application/json
+          content:
+            text/plain:
+              schema:
+                type: string
+        "422":
+          description: JSON valide mais champ requis manquant ou de type incorrect
+          content:
+            text/plain:
+              schema:
+                type: string
+        "429":
+          description: Limite d'envois par minute atteinte (corps vide)
+        "501":
+          description: Canal push, réservé et non implémenté (corps vide)
+        "502":
+          description: Échec de transmission au serveur SMTP (corps vide)
+        "500":
+          description: Erreur interne, message non constructible (corps vide)
+components:
+  securitySchemes:
+    InternalSecret:
+      type: apiKey
+      in: header
+      name: x-internal-secret
+      description: >-
+        Secret d'authentification inter-services, comparé en temps constant à
+        INTERNAL_API_SECRET.
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+    SendRequest:
+      type: object
+      required: [channel, to, subject]
+      properties:
+        channel:
+          type: string
+          enum: [email, push]
+          description: email opérationnel ; push réservé (répond 501).
+        to:
+          type: string
+          format: email
+          description: Destinataire unique et valide (une virgule est refusée).
+        subject:
+          type: string
+          description: Requis, sans retour à la ligne.
+        html:
+          type: string
+          nullable: true
+          description: Corps HTML. Optionnel, mais html ou text doit être non vide.
+        text:
+          type: string
+          nullable: true
+          description: Corps texte. Optionnel, mais html ou text doit être non vide.
+    SendResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: sent

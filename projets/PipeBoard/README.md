@@ -2,62 +2,31 @@
 
 <img src="logo.png" alt="Logo PipeBoard" width="64" height="64" />
 
-![version](https://img.shields.io/badge/version-2.1.0-blue) ![statut](https://img.shields.io/badge/statut-production-brightgreen)
+![section](https://img.shields.io/badge/section-QVL--ToolBox-1f6feb)
 
 > Tableau de bord des pipelines et de l'outillage interne (**QVL-ToolBox**).
 
-PipeBoard agrège l'état des pipelines CI/CD de la flotte et donne une vue consolidée des déploiements, des temps d'exécution et des échecs récents.
+PipeBoard est un projet de la boîte à outils **QVL-ToolBox** : un tableau de bord dédié au suivi des pipelines et de l'outillage interne de la flotte.
 
 ## Sommaire
 
-- [Vue d'ensemble](#vue-densemble)
-- [Indicateurs](#indicateurs)
-- [Backlog](#backlog)
-- [Chaîne de déploiement](#chaîne-de-déploiement)
+- [En bref](#en-bref)
+- [Documentation complète](#documentation-complète)
 
-## Vue d'ensemble
+## En bref
 
-| Pipeline        | Environnement | Dernier run | Statut   |
-|-----------------|---------------|-------------|----------|
-| build-canopui   | prod          | 12 min      | Succès   |
-| deploy-portails | prod          | 34 min      | Succès   |
-| e2e-nightly     | staging       | 6 h         | Échec    |
-| lint-global     | ci            | 3 min       | Succès   |
+- **Section** : QVL-ToolBox (briques & services réutilisables, destinés aux développeurs).
+- **Rôle** : suivi des pipelines et de l'outillage interne.
 
-## Indicateurs
+## Documentation complète
 
-- [x] Taux de réussite des pipelines
-- [x] Durée moyenne d'exécution
-- [ ] Alerte Teams sur échec consécutif
-- [ ] Historique des artefacts par version
+La documentation de référence de PipeBoard est maintenue dans le dossier QVL-ToolBox :
 
-## Backlog
-
-<details>
-<summary>Éléments en attente de priorisation</summary>
-
-- Widget de tendance sur 30 jours
-- Filtrage par équipe et par section QVL
-- Export CSV des métriques
-- Vue mobile compacte
-
-</details>
-
-## Chaîne de déploiement
-
-```mermaid
-flowchart TD
-    Commit[Commit sur main] --> Build[Build & tests]
-    Build --> Pack[Packaging]
-    Pack --> Staging[Déploiement staging]
-    Staging --> Gate{Validation ?}
-    Gate -- Oui --> Prod[Déploiement production]
-    Gate -- Non --> Rollback[Retour arrière]
-```
+**→ [Documentation PipeBoard](../../QVL-ToolBox/PipeBoard/README.md)**
 
 ## Liens utiles
 
-- [Documentation pipeline](../../pipeline/README.md)
+- [Pipeline CI/CD](../../pipeline/README.md)
 - Dépôt miroir : <https://github.com/QVL-ToolBox/PipeBoard>
 
 ---
