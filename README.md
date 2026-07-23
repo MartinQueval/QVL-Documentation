@@ -69,9 +69,12 @@ In short: **fork it and run your own if you like — but the author's instance s
 | 🚪 ProjectCenter — entry portal | [QVL-ProjectCenter](QVL-ProjectCenter/README.md) |
 | 🧩 QVL-Studio — dev meta-workspace | [QVL-Studio](QVL-Studio/README.md) |
 | 🏠 QVL CustHome | [QVL-CustHome](QVL-CustHome/README.md) |
+| 🎮 QVL Hobbies | [QVL-Hobbies](QVL-Hobbies/README.md) |
 | 🧰 QVL Tool Box | [QVL-ToolBox](QVL-ToolBox/README.md) |
 | 🦊 Hosting & infrastructure | [hebergement](hebergement/README.md) |
 | 🔄 CI/CD pipeline | [pipeline](pipeline/README.md) |
+
+> 🗓️ **Decision (2026-07-23)** — added the **QVL Hobbies** documentation area, starting with the **HB-Api-Cocktail** service card and its OpenAPI spec (Go + SQLite, public read / local write). Not tied to any sprint.
 
 ## 🔀 Storage & mirroring architecture
 
@@ -169,9 +172,12 @@ En résumé : **forkez-le et hébergez le vôtre si vous le souhaitez — mais l
 | 🚪 ProjectCenter — portail d'entrée | [QVL-ProjectCenter](QVL-ProjectCenter/README.md) |
 | 🧩 QVL-Studio — méta-workspace de dev | [QVL-Studio](QVL-Studio/README.md) |
 | 🏠 QVL CustHome | [QVL-CustHome](QVL-CustHome/README.md) |
+| 🎮 QVL Hobbies | [QVL-Hobbies](QVL-Hobbies/README.md) |
 | 🧰 QVL Tool Box | [QVL-ToolBox](QVL-ToolBox/README.md) |
 | 🦊 Hébergement & infrastructure | [hebergement](hebergement/README.md) |
 | 🔄 Pipeline CI/CD | [pipeline](pipeline/README.md) |
+
+> 🗓️ **Décision (2026-07-23)** — ajout du domaine de documentation **QVL Hobbies**, avec en premier la fiche du service **HB-Api-Cocktail** et sa spec OpenAPI (Go + SQLite, lecture publique / écriture locale). Non rattaché à un sprint.
 
 ## 🔀 Architecture de stockage & mise en miroir
 
