@@ -3,9 +3,11 @@
 > Design system React de la flotte **QVL** — socle commun des portails, construit en wrapper au-dessus de **MUI**.
 
 ![package](https://img.shields.io/badge/package-canopui-cb3837?logo=npm&logoColor=white)
-![version](https://img.shields.io/badge/version-1.1.1-blue)
+![version](https://img.shields.io/badge/version-2.0.1-blue)
 ![stack](https://img.shields.io/badge/React%2019%20·%20Vite%207%20·%20TypeScript-1f6feb)
 ![registry](https://img.shields.io/badge/registry-npm.qvl--project.com-4b5e40)
+
+> 🎨 **Direction Artistique** — le langage visuel complet (principes, palette clair/sombre, typographie, espacements, rayons, élévation, mouvement, responsive, décors) est documenté dans **[direction-artistique.md](direction-artistique.md)**.
 
 ## Rôle
 
@@ -25,7 +27,7 @@ CanopUI est la **librairie de composants React partagée** entre les portails de
 | Langage | TypeScript strict |
 | Fondation | MUI 7 + Emotion (peer dependencies) |
 | Tests | Vitest |
-| Vitrine | Ladle |
+| Vitrine | Site maison (construit avec les composants CanopUI) |
 
 ## Installation
 
@@ -163,7 +165,7 @@ Surcharger 2-3 variables `--ch-*` dans une feuille chargée après la lib suffit
 
 ## Vitrine
 
-Les composants sont présentés dans la vitrine **Ladle**, déployée sur **[canopui.qvl-project.com](https://canopui.qvl-project.com)** (exposée via le [tunnel Cloudflare](../hebergement/tunnel-cloudflare.md)). En local : `npm run ladle`.
+Les composants sont présentés dans la **vitrine maison** (`vitrine/`, construite avec les composants CanopUI eux-mêmes), déployée sur **[canopui.qvl-project.com](https://canopui.qvl-project.com)** (exposée via le [tunnel Cloudflare](../hebergement/tunnel-cloudflare.md)). En local : `npm run vitrine` (port 61000).
 
 ## Versioning & release
 
@@ -183,13 +185,14 @@ La CI CanopUI tourne sur un runner GitLab **shell executor** (WSL). Les jobs sen
 
 ```bash
 npm install
-npm run ladle    # vitrine des composants
+npm run vitrine  # vitrine des composants (port 61000)
 npm test         # tests unitaires
 npm run build    # build de la lib (dist/)
 ```
 
 ## Liens utiles
 
+- **Direction Artistique** : [direction-artistique.md](direction-artistique.md) — principes, langage visuel et tokens de référence
 - Vitrine : [canopui.qvl-project.com](https://canopui.qvl-project.com)
 - Registre npm : [guide du registre](../hebergement/registre-npm.md)
 - Pipeline CI/CD : [documentation pipeline](../pipeline/README.md)
