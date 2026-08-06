@@ -17,6 +17,25 @@ PipeBoard est un dashboard centralisé, en lecture seule, des pipelines de gitla
 
 L'hôte du backend est forcé sur `127.0.0.1` (jamais `0.0.0.0`). Le front proxifie `/api` vers `http://127.0.0.1:5191`. En production, le backend sert aussi le build statique du front depuis `dist/`.
 
+## Hébergement et déploiement
+
+Production : **https://tb-pipeboard.qvl-project.com** — service systemd `tb-pipeboard` (WSL, utilisateur `qvlsvc`, `WorkingDirectory=/opt/qvl-toolbox/pipeboard`), exposé via le Cloudflare Tunnel `qvl-infra`.
+
+**Seul projet de la flotte hébergé sur GitHub** (`github.com/QVL-ToolBox/PipeBoard`) et **sans CI** : le runner GitLab ne peut pas l'atteindre. Le déploiement est manuel, par script, sur le serveur QVL :
+
+```bash
+sudo tb-deploy-pipeboard              # source par défaut : /mnt/c/QVL/QVL-ToolBox/PipeBoard
+```
+
+Le script copie les sources, installe, construit sur la **dernière CanopUI publiée** (`npm install canopui@latest`), bascule atomiquement dans `/opt/qvl-toolbox/pipeboard` et redémarre le service — avec restauration automatique de la version précédente si le service ne repart pas.
+
+Deux contraintes qu'il porte :
+
+- **Le build ne peut pas se faire sur `/mnt/c`** : npm y échoue sur `chmod` (`EPERM`, limite du FS Windows vu depuis WSL). Le script construit dans un répertoire natif WSL.
+- **Les `devDependencies` sont nécessaires au runtime** (`npm start` lance le serveur via `tsx`) : ne jamais élaguer avec `npm prune --omit=dev`.
+
+> Contrepartie de l'absence de CI : la production dérive silencieusement. Elle est restée sur `canopui@1.0.1` alors que la migration 2.x était committée depuis longtemps — écart détecté et corrigé le 2026-08-06 (passage direct en `2.3.0`). Relancer le script après toute évolution du design system.
+
 ## Configuration
 
 Aucun fichier de configuration n'est requis. Les groups surveillés sont découverts automatiquement après enregistrement du token, via les groups dont le porteur du token est membre (`GET /groups?membership=true` côté GitLab). Les sous-groups descendants sont écartés car le listing des projets est déjà récursif. Le registre npm QVL est configuré dans `.npmrc` (lecture anonyme) ; installation reproductible via `npm ci`.
