@@ -13,6 +13,11 @@ servers:
 tags:
   - name: Profil
   - name: Comptes
+  - name: Transactions
+  - name: Catégories
+  - name: Règles
+  - name: Budgets
+  - name: Agrégats
   - name: Banques
   - name: Consentements
   - name: Opérationnel
@@ -120,6 +125,12 @@ components:
           format: uuid
         label:
           type: string
+        clean_label:
+          type: string
+          description: >-
+            Tiers extrait du libellé (marchand ou contrepartie), débarrassé des
+            préfixes d'opération, dates, masques de carte et références. Forme
+            stable d'un mois sur l'autre, contrairement au libellé brut.
         amount_cents:
           type: integer
           format: int64
@@ -136,6 +147,16 @@ components:
           type: string
           format: date
           nullable: true
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+        categorization_source:
+          type: string
+          enum: [manual, rule, none]
+          description: >-
+            Origine de la catégorisation. Les traitements automatiques ne
+            touchent que les transactions en `none`.
     Bank:
       type: object
       properties:
@@ -252,7 +273,199 @@ components:
         total:
           type: integer
           format: int64
+    Category:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        kind: { type: string, enum: [revenu, depense] }
+        color: { type: string }
+        icon: { type: string }
+        is_default:
+          type: boolean
+          description: Catégorie système (partagée, non modifiable par le propriétaire).
+        transaction_count: { type: integer, format: int64 }
+        created_at: { type: string, format: date-time }
+    CategoryRequest:
+      type: object
+      required: [name, kind]
+      properties:
+        name: { type: string }
+        kind: { type: string, enum: [revenu, depense] }
+        color: { type: string, nullable: true }
+        icon: { type: string, nullable: true }
+    CategoryList:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Category' }
+        total: { type: integer, format: int64 }
+    CategorizationRule:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        label_pattern: { type: string }
+        category_id: { type: string, format: uuid }
+        priority: { type: integer }
+        created_at: { type: string, format: date-time }
+    CreateCategorizationRuleRequest:
+      type: object
+      required: [label_pattern, category_id]
+      properties:
+        label_pattern: { type: string, maxLength: 140 }
+        category_id: { type: string, format: uuid }
+        priority: { type: integer, nullable: true }
+    CategorizeTransactionRequest:
+      type: object
+      required: [category_id]
+      properties:
+        category_id: { type: string, format: uuid }
+    RecategorizeResult:
+      type: object
+      properties:
+        categorisees:
+          type: integer
+          format: int64
+          description: Nombre de transactions nouvellement catégorisées.
+    ConsolidatedBalance:
+      type: object
+      properties:
+        total_cents: { type: integer, format: int64 }
+        total_a_venir_cents:
+          type: integer
+          format: int64
+          nullable: true
+          description: >-
+            Total intégrant les opérations en attente. Absent si aucune banque
+            n'expose de solde à venir ; les comptes qui n'en fournissent pas
+            comptent alors pour leur solde courant.
+        accounts:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              iban_masked: { type: string }
+              currency: { type: string }
+              balance: { type: integer, format: int64 }
+              solde_a_venir_cents:
+                type: integer
+                format: int64
+                nullable: true
+                description: Omis quand la banque ne l'expose pas.
+    Budget:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        category_id: { type: string, format: uuid }
+        montant_cents: { type: integer, format: int64 }
+        mois: { type: string, example: '2026-08' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    UpsertBudgetRequest:
+      type: object
+      required: [category_id, montant_cents, mois]
+      properties:
+        category_id: { type: string, format: uuid }
+        montant_cents: { type: integer, format: int64 }
+        mois: { type: string, example: '2026-08' }
+    BudgetList:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Budget' }
+        total: { type: integer, format: int64 }
+    RemainingBudgets:
+      type: object
+      properties:
+        month: { type: string, example: '2026-08' }
+        total:
+          type: object
+          description: Somme exacte des lignes de `categories`.
+          properties:
+            montant_prevu_cents: { type: integer, format: int64 }
+            depense_cents: { type: integer, format: int64 }
+            reste_cents: { type: integer, format: int64 }
+        categories:
+          type: array
+          items:
+            type: object
+            properties:
+              category_id: { type: string, format: uuid }
+              category_name: { type: string, nullable: true }
+              kind: { type: string, enum: [revenu, depense], nullable: true }
+              color: { type: string, nullable: true }
+              icon: { type: string, nullable: true }
+              montant_prevu_cents:
+                type: integer
+                format: int64
+                description: >-
+                  Budget défini pour le mois, ou à défaut médiane des dépenses
+                  de la catégorie sur les 3 derniers mois.
+              depense_cents: { type: integer, format: int64 }
+              reste_cents: { type: integer, format: int64 }
+              depassement_cents: { type: integer, format: int64 }
+              depasse: { type: boolean }
+    MonthlyExpenses:
+      type: object
+      properties:
+        month: { type: string, example: '2026-08' }
+        total_cents: { type: integer, format: int64 }
+        categories:
+          type: array
+          items:
+            type: object
+            properties:
+              category_id: { type: string, format: uuid, nullable: true }
+              category_name: { type: string, nullable: true }
+              kind: { type: string, enum: [revenu, depense], nullable: true }
+              color: { type: string, nullable: true }
+              icon: { type: string, nullable: true }
+              amount_cents: { type: integer, format: int64 }
+    Forecast:
+      type: object
+      properties:
+        month: { type: string, example: '2026-08' }
+        solde_previsionnel_cents:
+          type: integer
+          format: int64
+          description: revenus_recurrents − depenses_recurrentes − budgets.
+        revenus_recurrents_cents:
+          type: integer
+          format: int64
+          description: >-
+            Médiane des crédits mensuels par catégorie de revenu sur 3 mois.
+            Un salaire à montant et libellé variables serait invisible à la
+            détection de récurrence, qui exige un montant fixe.
+        depenses_recurrentes_cents:
+          type: integer
+          format: int64
+          description: Détection d'occurrences à montant fixe (abonnements, charges).
+        budgets_cents: { type: integer, format: int64 }
+        donnees_suffisantes:
+          type: boolean
+          description: '`false` si ni récurrence détectée ni revenu prédit.'
+        categories:
+          type: array
+          items:
+            type: object
+            properties:
+              category_id: { type: string, format: uuid, nullable: true }
+              category: { type: string, nullable: true }
+              revenus_recurrents_cents: { type: integer, format: int64 }
+              depenses_recurrentes_cents: { type: integer, format: int64 }
+              budget_cents: { type: integer, format: int64 }
   parameters:
+    Month:
+      in: query
+      name: month
+      required: true
+      description: Mois au format `YYYY-MM`.
+      schema:
+        type: string
+        example: '2026-08'
     Limit:
       in: query
       name: limit
@@ -342,6 +555,299 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /accounts/{account_id}/transactions/{transaction_id}/category:
+    put:
+      tags: [Transactions]
+      summary: Catégorise manuellement une transaction
+      description: >-
+        Pose `categorization_source = manual`, jamais réécrit ensuite par un
+        traitement automatique. Ranger la transaction dans la catégorie système
+        « Virements internes » l'exclut de tous les agrégats ; l'en sortir la
+        réintègre.
+      parameters:
+        - in: path
+          name: account_id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: transaction_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategorizeTransactionRequest' }
+      responses:
+        '200':
+          description: Transaction catégorisée
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BankTransaction' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /accounts/{account_id}/transactions/{transaction_id}/rule:
+    post:
+      tags: [Règles]
+      summary: Crée une règle dérivée du libellé de la transaction
+      description: >-
+        Le motif est extrait automatiquement du libellé (tiers) : l'utilisateur
+        ne saisit rien. La règle est appliquée rétroactivement aux transactions
+        non catégorisées dans la foulée.
+      parameters:
+        - in: path
+          name: account_id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: transaction_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategorizeTransactionRequest' }
+      responses:
+        '201':
+          description: Règle créée
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategorizationRule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /transactions:
+    get:
+      tags: [Transactions]
+      summary: Transactions du propriétaire, tous comptes confondus
+      parameters:
+        - { in: query, name: account_id, schema: { type: string, format: uuid } }
+        - { in: query, name: category_id, schema: { type: string, format: uuid } }
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+        - { in: query, name: type, schema: { type: string, enum: [credit, debit] } }
+        - { in: query, name: sort, schema: { type: string, enum: [date, amount], default: date } }
+        - { in: query, name: order, schema: { type: string, enum: [asc, desc], default: desc } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Transactions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransactionList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /transactions/recategoriser:
+    post:
+      tags: [Transactions]
+      summary: Réconcilie la catégorisation du propriétaire
+      description: >-
+        Idempotent, appelé par le portail à son chargement. Trois temps :
+        appariement des virements internes, ré-application de toutes les règles,
+        puis mise en « Salaire » des crédits restants. Ne touche que les
+        transactions en `categorization_source = none`.
+      responses:
+        '200':
+          description: Réconciliation effectuée
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecategorizeResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /balance:
+    get:
+      tags: [Agrégats]
+      summary: Solde consolidé de tous les comptes
+      responses:
+        '200':
+          description: Solde consolidé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConsolidatedBalance' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /categories:
+    get:
+      tags: [Catégories]
+      summary: Catégories système et propres au propriétaire
+      responses:
+        '200':
+          description: Catégories
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Catégories]
+      summary: Crée une catégorie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryRequest' }
+      responses:
+        '201':
+          description: Catégorie créée
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /categories/{category_id}:
+    put:
+      tags: [Catégories]
+      summary: Modifie une catégorie du propriétaire
+      parameters:
+        - in: path
+          name: category_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryRequest' }
+      responses:
+        '200':
+          description: Catégorie modifiée
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Catégories]
+      summary: Supprime une catégorie du propriétaire
+      parameters:
+        - in: path
+          name: category_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Catégorie supprimée }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /categorization-rules:
+    post:
+      tags: [Règles]
+      summary: Crée une règle de catégorisation
+      description: >-
+        Le motif est comparé au **tiers extrait** du libellé, pas au libellé
+        brut. Un motif réduit à un préfixe d'opération (« ACHAT », « CARTE »)
+        ne matche donc rien.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCategorizationRuleRequest' }
+      responses:
+        '201':
+          description: Règle créée et appliquée rétroactivement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategorizationRule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /budgets:
+    get:
+      tags: [Budgets]
+      summary: Budgets mensuels par catégorie
+      parameters:
+        - in: query
+          name: mois
+          required: true
+          schema: { type: string, example: '2026-08' }
+      responses:
+        '200':
+          description: Budgets
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BudgetList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Budgets]
+      summary: Crée ou met à jour le budget d'une catégorie pour un mois
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpsertBudgetRequest' }
+      responses:
+        '201':
+          description: Budget enregistré (upsert idempotent)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Budget' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /budgets/remaining:
+    get:
+      tags: [Budgets]
+      summary: Reste à dépenser par catégorie
+      description: >-
+        Si des budgets sont définis pour le mois, le montant prévu est le
+        budget. Sinon il est prédit sur la médiane des 3 derniers mois. Le
+        `total` est la somme exacte des lignes renvoyées.
+      parameters:
+        - $ref: '#/components/parameters/Month'
+      responses:
+        '200':
+          description: Reste à dépenser
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RemainingBudgets' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /expenses/by-category:
+    get:
+      tags: [Agrégats]
+      summary: Dépenses du mois réparties par catégorie
+      description: Les transactions sans catégorie forment une ligne à champs `null`.
+      parameters:
+        - $ref: '#/components/parameters/Month'
+      responses:
+        '200':
+          description: Répartition des dépenses
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MonthlyExpenses' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /forecast:
+    get:
+      tags: [Agrégats]
+      summary: Budget prévisionnel du mois
+      parameters:
+        - $ref: '#/components/parameters/Month'
+      responses:
+        '200':
+          description: Prévisionnel
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Forecast' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /banks:
     get:
       tags: [Banques]
