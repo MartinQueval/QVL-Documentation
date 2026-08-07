@@ -14,6 +14,18 @@ Il est exposé par [CH-Api-GateWay](../CH-Api-GateWay/README.md) sous le préfix
 - **Auth** : JWT HS256 validé localement (secret partagé avec l'Authenticator)
 - **Version** : 0.1.0
 
+### Dépendance système : `poppler-utils`
+
+Les vignettes de **PDF** sont produites en appelant `pdftoppm` en sous-processus (paquet `poppler-utils`, à installer sur le serveur) :
+
+```bash
+sudo apt install poppler-utils
+```
+
+Choix assumé plutôt qu'une bibliothèque native liée au binaire : aucun moteur de rendu PDF pur Rust n'est mûr, et lier `pdfium`/`mupdf` alourdirait la compilation comme le déploiement pour un besoin marginal. C'est une dépendance de **runtime** uniquement — la compilation n'en a pas besoin.
+
+Si l'outil est absent, la génération échoue silencieusement : le fichier est créé normalement et l'interface affiche l'icône de type. Aucun upload n'est jamais mis en échec par l'aperçu.
+
 ## Port par défaut
 
 `8182` (clé `server.port` de `config.toml`, surchargée par la variable `PORT`).
@@ -25,7 +37,8 @@ Il est exposé par [CH-Api-GateWay](../CH-Api-GateWay/README.md) sous le préfix
 - **Quotas** : chaque utilisateur Drive a un `quota_bytes` et un `used_bytes`. Le quota par défaut est configurable ; l'upload est refusé au-delà (`413 quota_exceeded`).
 - **Upload par chunks** : session ouverte (`POST /uploads`), envoi des chunks (`PUT /uploads/{id}/chunks/{index}`), finalisation (`POST /uploads/{id}/complete`). Les sessions ont un TTL (24 h) et réservent le quota. États : `open`, `completing`, `completed`, `aborted`.
 - **Corbeille** : mise en corbeille (`trash`), restauration (`restore`), purge (`purge_trash` ou suppression définitive d'un nœud).
-- **Sécurité de service** : `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, neutralisation des types actifs (SVG, HTML, JS…) au téléchargement ; support des requêtes `Range`.
+- **Vignettes** : générées à l'upload — par les deux chemins, simple et par chunks — pour les images (via `image`) et les PDF (première page, via `pdftoppm`). Exposées par `GET /files/{id}/thumbnail` et signalées par `has_thumbnail`. L'échec de génération n'est jamais bloquant.
+- **Sécurité de service** : `X-Content-Type-Options: nosniff`, neutralisation des types actifs (SVG, HTML, JS…) au téléchargement ; support des requêtes `Range`. Le `Content-Disposition` vaut **`inline` pour une liste étroite** (PDF et images bitmap), afin de permettre la prévisualisation dans le navigateur, et **`attachment` pour tout le reste**. La décision se prend sur le type *servi*, après neutralisation : un format actif ne peut donc pas être rendu dans l'origine de l'application.
 - **Administration** : rôle `drive_admin` requis. La résolution nom/email des propriétaires s'appuie sur `POST /internal/users/resolve` de l'Authenticator.
 - **Événements** : publication d'un événement « fichier téléversé » sur le bus Relay (best-effort).
 
