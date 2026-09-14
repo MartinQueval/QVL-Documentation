@@ -48,6 +48,14 @@ CH-Relay (broker MQTT 5.0) :1883 (TCP) · :8083 (WebSocket) · :8883 (TLS)
 | CH-Api-Budgy | Service de budget bancaire | [CH-Api-Budgy/README.md](CH-Api-Budgy/README.md) · [openapi.yaml](CH-Api-Budgy/openapi.yaml) |
 | CH-Relay | Broker MQTT 5.0 | [CH-Relay/README.md](CH-Relay/README.md) |
 | Tools | Scripts d'orchestration | [Tools/README.md](Tools/README.md) |
+| CH-Api-Maloe | IA auto-hébergée — **en conception, non implémenté** | [CH-Api-Maloe/CONCEPTION.md](CH-Api-Maloe/CONCEPTION.md) |
+
+> 🗓️ **Décision (2026-08-21)** — ajout du document de conception de **Maloë**, IA auto-hébergée de
+> CustHome (Ollama + tiers de modèles, identité versionnée, mémoire par utilisateur). Retenu en séance :
+> Core en **Rust** (cohérence du dépôt), flux de génération via **CH-Relay** et non en SSE proxifié
+> (le Gateway tue toute requête à 5 s), et accès aux API via un **grant explicite scopé et révocable**
+> plutôt que par réutilisation des tokens utilisateur — le claim `ip` et le TTL de 15 min l'interdisent
+> de fait. Non rattaché à un sprint.
 
 ## Flux d'authentification
 
