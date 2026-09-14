@@ -1,5 +1,7 @@
 # Tools
 
+> ⚠️ **Documentation non vérifiée contre le code.** Le repo `Tools` n'est **pas présent en local** sous `C:\QVL\QVL-CustHome\` (seuls les repos de services y figurent). Les scripts décrits ci-dessous n'ont donc pas pu être relus à leur source : le contenu reflète l'état documenté antérieurement et peut avoir divergé. À revalider dès que le repo est cloné localement.
+
 Outillage et scripts d'orchestration transverses de l'écosystème CustHome. Ce repo se clone à la racine du projet, au même niveau que les repos de services.
 
 ```
@@ -55,6 +57,8 @@ Lance tous les services CustHome dans le bon ordre (Windows Git Bash et Linux).
 | Non-critique | Missive | `$MISSIVE_DIR` (hors arbre) | `http://localhost:8184/health` |
 
 Bases vérifiées : MongoDB Auth (`localhost:27017`, critique) et PostgreSQL Drive (`localhost:5432`, non-critique).
+
+> ℹ️ **Maloe (5ᵉ service)** — un service **API Maloe** a été ajouté à l'écosystème (route gateway `/api/maloe` → `localhost:8191`, audience `ml-api-maloe`, rôle `portail_maloe`). Il n'a **pas** de portail front dédié. Ce tableau ne le liste pas encore : à intégrer à `startup.sh`/`shutdown.sh` (et son health check `http://localhost:8191/health`, à confirmer) lors de la prochaine resynchronisation du repo `Tools`.
 
 ### Bases de données et services
 

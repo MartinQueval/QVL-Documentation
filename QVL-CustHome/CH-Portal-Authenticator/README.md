@@ -2,7 +2,7 @@
 
 Portail d'authentification de l'écosystème **CustHome** : point d'entrée unique (SSO) où les utilisateurs se connectent, s'inscrivent, réinitialisent leur mot de passe et gèrent leur compte. Tous les autres portails (Admin, Drive, Budgy) y renvoient l'utilisateur non authentifié.
 
-![React](https://img.shields.io/badge/React-19-61dafb) ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6) ![Vite](https://img.shields.io/badge/Vite-7-646cff) ![canopui](https://img.shields.io/badge/canopui-1.0.1-lightgrey) ![Express](https://img.shields.io/badge/Express-5-000000)
+![React](https://img.shields.io/badge/React-19-61dafb) ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6) ![Vite](https://img.shields.io/badge/Vite-7-646cff) ![canopui](https://img.shields.io/badge/canopui-latest-lightgrey) ![Express](https://img.shields.io/badge/Express-5-000000)
 
 ## Stack
 
@@ -96,6 +96,7 @@ Voir la documentation de l'API : [../CH-Api-Authenticator/README.md](../CH-Api-A
 - **CGU** : page `/cgu` dédiée (composants `CguTerms` + `LegalNotice`), lien obligatoire à l'inscription via une case à cocher renvoyant la version des termes acceptée (`accepted_terms_version`).
 - **Inscription conditionnelle** : le formulaire `Register` interroge `/settings/registration` ; si l'inscription est désactivée, il affiche un message d'information au lieu du formulaire.
 - **Portail émetteur du SSO** : c'est le seul des quatre portails sans garde de rôle ; toutes ses pages sont publiques.
+- **Appareil non autorisé** : sur un compte en liste d'appareils (`whitelist_only`), une connexion depuis un appareil non reconnu renvoie le code d'erreur `device_not_allowed` ; le formulaire de connexion (`useLogin`) l'intercepte et affiche un message dédié plutôt que l'erreur générique d'identifiants (voir la whitelist par cookie `ch_device` côté [Authenticator API](../CH-Api-Authenticator/README.md)).
 
 ## Incohérences relevées
 

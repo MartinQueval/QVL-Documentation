@@ -12,7 +12,7 @@ Il est appelé par [CH-Api-GateWay](../CH-Api-GateWay/README.md) :
 - **Framework HTTP** : Axum 0.8
 - **Base de données** : MongoDB (driver `mongodb` 3)
 - **Sécurité** : Argon2id (hachage des mots de passe), JWT HS256 (`jsonwebtoken`), rate limiting (`governor`)
-- **Version** : 0.1.0
+- **Version** : v1.0.0 (tag Git ; `Cargo.toml` porte encore `0.1.0`)
 
 ## Port par défaut
 
@@ -20,9 +20,9 @@ Il est appelé par [CH-Api-GateWay](../CH-Api-GateWay/README.md) :
 
 ## Concepts clés
 
-- **Rôles par portail** : un utilisateur porte une liste de rôles ; le rôle nommé comme un portail (`admin`, `drive`, `home`, `budgy`) donne accès au portail correspondant. La Gateway transmet le portail visé via le header `X-Portal` ; l'Authenticator vérifie que ce portail est connu au `/validate`.
-- **Whitelist IP par utilisateur** : `whitelist_only` + `allowed_ips` (IP ou CIDR), vérifiée au login. Quand elle est active, le token embarque l'IP (claim `ip`), contrôlée au `/validate` via `X-Client-IP`.
-- **JWT stateless HS256** (TTL 15 min) posé en cookie `HttpOnly` (`ch_token`) au login, accompagné d'un **refresh token** rotatif (cookie `ch_refresh`, TTL 7 jours) avec détection de réutilisation (révocation de la famille).
+- **Rôles par portail** : un utilisateur porte une liste de rôles ; le rôle nommé comme un portail (`admin`, `drive`, `home`, `budgy`, `maloe`) donne accès au portail correspondant. La Gateway transmet le portail visé via le header `X-Portal` (`portail_admin`, `portail_drive`, `portail_home`, `portail_budgy`, `portail_maloe`) ; l'Authenticator vérifie que ce portail est connu au `/validate`. Chaque rôle de portail applicatif projette une audience JWT : `drive` → `ch-api-drive`, `budgy` → `ch-api-budgy`, `maloe` → `ml-api-maloe` (les rôles `admin` et `home` n'ont pas d'audience).
+- **Whitelist par appareil (`ch_device`)** : depuis le 2026-08-10, l'accès n'est plus restreint par adresse IP mais par **appareil reconnu**. Le modèle ne comporte plus ni `allowed_ips` ni claim JWT `ip`. Chaque utilisateur porte un drapeau `whitelist_only` et une liste `devices[]`. Un cookie `ch_device` (HttpOnly, `Max-Age` 2 ans) identifie le navigateur indépendamment du réseau ; seul le **hash SHA-256** de son secret est stocké (jamais en clair), aux côtés d'un `id` public (utilisé pour la révocation), d'un `label`, de `first_seen`/`last_seen` et d'un `last_ip` purement indicatif. Tant que le compte n'est pas verrouillé, tout appareil inconnu s'inscrit de lui-même au login ; une fois `whitelist_only` actif, un appareil inconnu est refusé (`device_not_allowed`) et le refresh depuis un appareil inconnu invalide la session. **Garde-fous anti-verrouillage** : activer `whitelist_only` sans aucun appareil reconnu, ou retirer le dernier appareil d'un compte restreint, est refusé (`400 bad_request`).
+- **JWT stateless HS256** (TTL 15 min) posé en cookie `HttpOnly` (`ch_token`) au login, accompagné d'un **refresh token** rotatif (cookie `ch_refresh`, TTL 7 jours) avec détection de réutilisation (révocation de la famille). Claims émis : `sub`, `roles`, `iss`, `aud`, `iat`, `exp` — le claim `ip` n'est **plus émis** (le champ subsiste seulement pour valider d'anciens jetons).
 - **Statuts de compte** : `pending_validation`, `active`, `disabled`.
 - **CGU** : l'inscription exige l'acceptation de la version courante des conditions générales.
 
@@ -76,7 +76,7 @@ Les routes applicatives sont exposées **sous le préfixe `/v1`** et, pour compa
 | POST | `/login` | non | Connexion → JWT + cookies HttpOnly | 200, 400, 401, 403, 429 |
 | POST | `/refresh` | cookie `ch_refresh` | Rotation du refresh token → nouvelle session | 200, 401, 429 |
 | POST | `/logout` | cookie `ch_refresh` | Déconnexion (révocation de la famille de tokens) | 200 |
-| GET | `/validate` | Bearer + `X-Portal` | Validation du token pour la Gateway | 200, 401, 403 |
+| GET | `/validate` | Bearer + `X-Portal` | Validation du token pour la Gateway (`X-Client-IP` = chemin **legacy**, consulté seulement si le jeton porte encore un claim `ip`) | 200, 401, 403 |
 | PUT | `/password` | Bearer | Changement de mot de passe (mot de passe actuel requis) | 200, 400, 401 |
 | POST | `/password/forgot` | non | Demande de lien de réinitialisation (anti-énumération : 202 systématique) | 202, 400, 429 |
 | POST | `/password/reset` | non | Réinitialisation via token one-time | 200, 400 |
@@ -100,9 +100,10 @@ Les routes applicatives sont exposées **sous le préfixe `/v1`** et, pour compa
 | PUT | `/users/{id}/status` | admin | Changement de statut | 200, 400, 404 |
 | PUT | `/users/{id}/password` | admin | Réinitialisation du mot de passe | 204, 400, 404 |
 | PUT | `/users/{id}/roles` | admin | Remplacement des rôles (validés contre le catalogue) | 200, 400, 404 |
-| PUT | `/users/{id}/whitelist` | admin | Configuration de la whitelist IP | 200, 400, 404 |
+| PUT | `/users/{id}/whitelist` | admin | Active/désactive la restriction aux appareils reconnus (corps : `{ whitelist_only }` uniquement) | 200, 400, 404 |
+| DELETE | `/users/{id}/devices/{device_id}` | admin | Révoque un appareil reconnu (garde-fou : refus si c'est le dernier d'un compte restreint) | 204, 400, 404 |
 | GET | `/analytics/traffic` | admin | Trafic par portail (query `period`: day/week/month/year) | 200, 401, 403 |
-| GET | `/settings/registration` | Bearer | État de l'inscription publique | 200 |
+| GET | `/settings/registration` | non | État de l'inscription publique (route **publique**, sans Bearer) | 200 |
 | PUT | `/settings/registration` | admin | Activation/désactivation de l'inscription | 200 |
 | GET | `/roles` | admin | Catalogue des rôles | 200, 401, 403 |
 | POST | `/roles` | admin | Création d'un sous-rôle de portail | 201, 400, 409 |
@@ -124,14 +125,19 @@ Les routes applicatives sont exposées **sous le préfixe `/v1`** et, pour compa
 
 | `error` | Statut | Cas |
 |---|---|---|
-| `bad_request` | 400 | Validation du corps |
+| `bad_request` | 400 | Validation du corps (dont garde-fous appareils) |
 | `unauthorized` | 401 | Identifiants ou token invalides |
-| `forbidden` | 403 | Accès refusé (rôle, portail, compte pending/disabled/device) |
+| `forbidden` | 403 | Accès refusé (rôle, portail inconnu, aucun rôle attribué) |
+| `account_pending` | 403 | Compte en attente de validation par un administrateur |
+| `account_disabled` | 403 | Compte désactivé |
+| `device_not_allowed` | 403 | Appareil non autorisé (compte en `whitelist_only`) |
 | `not_found` | 404 | Ressource inconnue |
 | `conflict` | 409 | Email ou rôle déjà utilisé |
 | `terms_not_accepted` / `terms_version_mismatch` | 422 | CGU non acceptées / version obsolète |
 | `too_many_requests` | 429 | Rate limit (header `Retry-After`) |
 | `internal_error` | 500 | Erreur interne |
+
+> Les codes 403 sont distincts et machine-lisibles : `forbidden` (rôle/portail), `account_pending`, `account_disabled`, `device_not_allowed`. Le corps est `{ "error": <code>, "message": <texte> }`.
 
 ## Pagination
 

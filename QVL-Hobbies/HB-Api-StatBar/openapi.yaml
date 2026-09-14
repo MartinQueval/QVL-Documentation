@@ -1,0 +1,310 @@
+openapi: 3.0.3
+info:
+  title: HB-Api-StatBar
+  version: 1.0.0
+  description: |
+    API du domaine Hobbies dediee a la notation de bars (application StatBar).
+
+    Service Node + Express 5 + TypeScript, adosse a MongoDB via Mongoose.
+
+    Ce document est redige d'apres les routes reelles : le service n'embarque
+    pas de specification OpenAPI (contrairement a HB-Api-Cocktail). Il n'a pas
+    d'URL publique propre ; il est consomme par la SPA HB-Front-StatBar, qui lui
+    relaie /api en meme origine.
+
+    La ressource `bars` est montee sous le prefixe /api/bars. Chaque bar porte
+    exactement une note par categorie (DRINK, AFFORDABILITY, VIBES, DECORATION),
+    de valeur 0..5, et une moyenne `moy` calculee par le serveur.
+servers:
+  - url: http://127.0.0.1:4000
+    description: |
+      Service local (valeur par defaut du code, PORT=4000). En production le
+      service ecoute sur 127.0.0.1:8311 (unite systemd hb-api-statbar) et n'est
+      joignable qu'a travers le relais /api de HB-Front-StatBar.
+  - url: http://127.0.0.1:8311
+    description: Production (loopback, relaye par HB-Front-StatBar)
+tags:
+  - name: bars
+    description: CRUD des bars notes.
+  - name: system
+    description: Sonde de disponibilite.
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: Sonde de disponibilite
+      description: Renvoie l'etat du service et de la connexion MongoDB.
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Service disponible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    service: api-bar
+                    db: connected
+  /api/bars:
+    get:
+      tags: [bars]
+      summary: Lister les bars
+      description: Liste tous les bars, tries par date de creation decroissante.
+      operationId: listBars
+      security: []
+      responses:
+        '200':
+          description: Liste des bars.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bar'
+    post:
+      tags: [bars]
+      summary: Creer un bar
+      operationId: createBar
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BarInput'
+            examples:
+              create:
+                value:
+                  name: Le Comptoir
+                  lat: 49.4432
+                  lng: 1.0999
+                  note:
+                    - { category: DRINK, value: 4 }
+                    - { category: AFFORDABILITY, value: 3 }
+                    - { category: VIBES, value: 5 }
+                    - { category: DECORATION, value: 4 }
+      responses:
+        '201':
+          description: Bar cree.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bar'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/bars/{id}:
+    parameters:
+      - $ref: '#/components/parameters/BarId'
+    get:
+      tags: [bars]
+      summary: Recuperer un bar
+      operationId: getBar
+      security: []
+      responses:
+        '200':
+          description: Bar trouve.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bar'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [bars]
+      summary: Mettre a jour un bar
+      description: |
+        Met a jour les champs fournis (`name`, `lat`, `lng`, `note`). Les champs
+        absents sont laisses inchanges. La moyenne `moy` est recalculee a la
+        sauvegarde.
+      operationId: updateBar
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BarUpdate'
+      responses:
+        '200':
+          description: Bar mis a jour.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bar'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [bars]
+      summary: Supprimer un bar
+      operationId: deleteBar
+      security: []
+      responses:
+        '204':
+          description: Bar supprime (pas de corps).
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  parameters:
+    BarId:
+      name: id
+      in: path
+      required: true
+      description: Identifiant MongoDB du bar (ObjectId).
+      schema:
+        type: string
+      example: 665f1c2e9b1a4c001f8e4a10
+  schemas:
+    NoteCategory:
+      type: string
+      enum: [DRINK, AFFORDABILITY, VIBES, DECORATION]
+      description: Categorie de note. Chaque bar porte exactement une note par categorie.
+    Note:
+      type: object
+      required: [category, value]
+      properties:
+        category:
+          $ref: '#/components/schemas/NoteCategory'
+        value:
+          type: number
+          minimum: 0
+          maximum: 5
+          example: 4
+    Bar:
+      type: object
+      required: [_id, name, lat, lng, note, moy]
+      properties:
+        _id:
+          type: string
+          example: 665f1c2e9b1a4c001f8e4a10
+        name:
+          type: string
+          example: Le Comptoir
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+          example: 49.4432
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+          example: 1.0999
+        note:
+          type: array
+          description: Exactement une entree par categorie (les 4 categories requises).
+          items:
+            $ref: '#/components/schemas/Note'
+        moy:
+          type: number
+          description: Moyenne des valeurs de note, arrondie a 2 decimales (calculee par le serveur).
+          example: 4
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    BarInput:
+      type: object
+      required: [name, lat, lng, note]
+      description: |
+        Corps de creation. `note` doit contenir exactement une entree pour
+        chacune des quatre categories, sous peine d'erreur de validation (400).
+      properties:
+        name:
+          type: string
+          example: Le Comptoir
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+          example: 49.4432
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+          example: 1.0999
+        note:
+          type: array
+          items:
+            $ref: '#/components/schemas/Note'
+    BarUpdate:
+      type: object
+      description: |
+        Corps de mise a jour. Tous les champs sont optionnels ; seuls les champs
+        fournis sont modifies. Un `note` fourni doit rester valide (une entree
+        par categorie).
+      properties:
+        name:
+          type: string
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+        note:
+          type: array
+          items:
+            $ref: '#/components/schemas/Note'
+    HealthStatus:
+      type: object
+      required: [status, service, db]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: api-bar
+        db:
+          type: string
+          enum: [connected, disconnected]
+          example: connected
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Message d'erreur lisible par un humain.
+          example: Bar not found
+  responses:
+    BadRequest:
+      description: |
+        Requete invalide : identifiant mal forme (`Invalid id`) ou echec de
+        validation Mongoose (`ValidationError`, par ex. note incomplete ou
+        coordonnees hors bornes).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            invalidId:
+              value:
+                error: Invalid id
+            validation:
+              value:
+                error: 'note must contain exactly one entry for each category: DRINK, AFFORDABILITY, VIBES, DECORATION'
+    NotFound:
+      description: Bar introuvable pour cet identifiant.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            notFound:
+              value:
+                error: Bar not found

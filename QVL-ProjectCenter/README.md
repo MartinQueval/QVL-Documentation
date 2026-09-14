@@ -4,8 +4,8 @@
 
 ![stack](https://img.shields.io/badge/React%2019%20·%20Vite%207%20·%20TypeScript%205.9-1f6feb)
 ![router](https://img.shields.io/badge/react--router-v7-ca4245)
-![design%20system](https://img.shields.io/badge/canopui-1.1.0-4b5e40)
-![deploy](https://img.shields.io/badge/projectcenter.qvl--project.com-nginx-6f42c1)
+![design%20system](https://img.shields.io/badge/canopui-baseline%20%5E2.2.0%20%C2%B7%20CI%20latest-4b5e40)
+![deploy](https://img.shields.io/badge/qvl--project.com%20(apex)-serve--vitrine%20%C2%B7%20cloudflared-6f42c1)
 
 ## Rôle
 
@@ -26,43 +26,47 @@ Les **sections** (QVL-Studio, QVL-Hobbies, QVL-ToolBox, QVL-CustHome) et les **p
 
 ## Chargement des docs au runtime
 
-Les pages de documentation ne sont pas embarquées dans le build : elles sont **récupérées au runtime, côté navigateur**, depuis le **miroir GitHub public raw** du dépôt `Documentation`.
+Les pages de documentation ne sont pas embarquées dans le build : elles sont **récupérées au runtime, côté navigateur**, depuis le dépôt public `QVL-Documentation` via l'**API GitLab v4** (projet `84403403`, passé public le 2026-07-16).
 
-- Le hook `useProjectDoc(docPath)` fait un `fetch` sur `new URL(docPath, VITE_DOCS_BASE_URL)`, gère les états `loading` / `error` (`notFound` sur 404, `network` sinon, avec `retry`) / `success`, et annule proprement via `AbortController`.
-- Le Markdown récupéré est ensuite rendu (sanitisé) par les composants `ProjectDocView` / `ProjectDocBody`.
-- La base d'URL est portée par la variable d'environnement **`VITE_DOCS_BASE_URL`** :
+- L'URL raw est construite par `buildGitlabRawUrl` (`src/lib/gitlabDocs.ts`), qui `encodeURIComponent` le chemin complet (les `/` deviennent `%2F`) et compose `{VITE_DOCS_API_PROJECT_URL}/repository/files/{chemin encodé}/raw?ref={VITE_DOCS_REF}`.
+- Le hook `useProjectDoc(docPath)` fait le `fetch` sur cette URL, gère les états `loading` / `error` (`notFound` sur 404, `network` sinon, avec `retry`) / `success`, et annule proprement via `AbortController`. Le même builder sert `ProjectLogo` (logos servis depuis le repo doc).
+- Le Markdown récupéré est ensuite rendu (sanitisé) par les composants `ProjectDocView` / `ProjectDocBody`. Les liens/images relatifs sont résolus vers des URL API v4 valides (`resolveRelativeDocPath` + `createDocUrlTransform`).
+- La source est portée par deux variables d'environnement :
 
 ```
-VITE_DOCS_BASE_URL=https://raw.githubusercontent.com/QVL-Studio/Documentation/main/
+VITE_DOCS_API_PROJECT_URL=https://gitlab.com/api/v4/projects/84403403
+VITE_DOCS_REF=main
 ```
 
-### Décision — source des docs distantes (ADR `cors-docs-source`)
+### Décision — source des docs distantes (ADR `docs-source-gitlab-api`)
 
-Le choix de la source résulte d'un spike (SCRUM-312) qui a testé le **CORS réel** (curl, en-têtes bruts, `Origin` de dev) de trois candidates :
+L'approche initiale (miroir GitHub raw via `VITE_DOCS_BASE_URL`, ADR `cors-docs-source`) a été **abandonnée** : depuis que le repo `QVL-Documentation` est **public** (2026-07-16), la doc est servie directement par l'**API GitLab v4**, ce qui supprime la dépendance au miroir GitHub. Le spike a validé le **CORS réel** (curl, en-têtes bruts, origine cross-origin) :
 
 | Source | CORS | Contenu servi | Verdict |
 |---|---|---|---|
-| API GitLab raw v4 | OK (`*`) | `404` + forme d'URL incompatible (`?ref=`, chemin encodé) | Écartée |
+| **API GitLab v4** (projet public) | **OK (`*`)** | **`200` ; forme `.../files/{encodé}/raw?ref=main`** | **Retenue** |
 | Route web GitLab `/-/raw/` | KO (302 sans en-tête) | — | Écartée |
-| **Miroir GitHub raw** | **OK (`*`)** | **`200`, concaténation `base + docPath`** | **Retenue** |
+| Miroir GitHub raw | OK (`*`) | `200` par concaténation `base + docPath` | Ancienne source, remplacée |
 
-Le miroir GitHub raw est la seule source simultanément fetchable en navigateur, servant réellement le contenu, et utilisable par simple concaténation `VITE_DOCS_BASE_URL + docPath`.
+L'API v4 impose une forme d'URL avec chemin encodé et suffixe `?ref=` (pas une simple concaténation) ; la construction est donc centralisée dans `src/lib/gitlabDocs.ts`. Voir l'ADR `docs/decisions/docs-source-gitlab-api.md` (qui remplace `cors-docs-source.md`, conservé pour historique).
 
 ## Design system : canopui
 
-ProjectCenter épingle la version **hébergée exacte** `canopui@1.1.0` depuis le [registre Verdaccio privé](../hebergement/registre-npm.md) (US6 / SCRUM-318). En développement, la lib peut aussi être consommée via un **tarball local** (`npm run canopui:local`, `canopui.local.tgz` gitignoré) : chaque pack injecte une version prerelease unique `X.Y.Z-local.<timestamp>` pour contourner le cache npm. Un hook `pre-commit` versionné (`.githooks`) **rejette** tout commit d'un `package-lock.json` épinglé en `-local` — la baseline committée reste `canopui@X.Y.Z`.
+ProjectCenter consomme [**canopui**](../QVL-CanopUI/README.md) depuis le [registre Verdaccio privé](../hebergement/registre-npm.md) suivant un modèle **« auto-pull + build sur `canopui@latest` »** (et non une version épinglée exacte). La baseline committée dans `package.json` est `canopui@^2.2.0`, mais la CI exécute `npm install canopui@latest` avant chaque `npm run build` : le build déployé embarque donc toujours la **dernière** CanopUI publiée (aujourd'hui `canopui@3.0.1`). En développement, la lib peut aussi être consommée via un **tarball local** (`npm run canopui:local`, `canopui.local.tgz` gitignoré) : chaque pack injecte une version prerelease unique `X.Y.Z-local.<timestamp>` pour contourner le cache npm. Un garde-fou (`tools/check-lock-no-local.sh`, appelé par un hook `pre-commit` versionné dans `.githooks` **et** par le job CI `lock-guard`) **rejette** tout `package-lock.json` épinglé en `-local`.
 
 ## Déploiement
 
-- **Hôte : nginx local QVL**, le même serveur que `npm.qvl-project.com` (Verdaccio) et `canopui.qvl-project.com` (vitrine). Vhost `projectcenter.qvl-project.com`, artefacts servis depuis `C:\QVL\deploy\projectcenter`, déploiement via `npm run deploy:local` (copie atomique).
-- **Deep-links** — l'app utilise `createBrowserRouter` ; nginx renvoie sur `index.html` (`try_files $uri $uri/ /index.html;`), donc pas de repli HashRouter nécessaire.
-- **CSP en défense en profondeur** — même politique portée à deux niveaux : meta tag injecté au **build** (plugin Vite, `apply: "build"`) et **header HTTP** délivré par nginx. Directives clés (Gate sécu 2) : `default-src 'self'` ; `connect-src 'self' https://raw.githubusercontent.com` (fetch docs) ; `img-src` autorisant `raw.githubusercontent.com` et `img.shields.io` (badges) ; `style-src 'self' 'unsafe-inline'` (MUI/emotion injectent leurs styles inline) ; `script-src 'self'`. Le header nginx ajoute `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy` et `server_tokens off`.
+- **SPA React servie à l'APEX `qvl-project.com`** — l'app est servie par `serve-vitrine.mjs` (**tâche Windows** `QVL-ProjectCenter`, port **8300**) derrière **cloudflared**. Il n'y a **pas** de vhost `projectcenter.qvl-project.com` ni de serveur nginx : ProjectCenter occupe l'apex du domaine.
+- **Déploiement par CI/CD GitLab** (`.gitlab-ci.yml`, runner shell local WSL Ubuntu-24.04). Sur `main`, le job `build` valide l'artefact, puis `deploy` **rebuild** (avec `npm install canopui@latest`) et copie atomiquement (`.new` puis swap) `dist/` vers `/mnt/c/QVL/deploy/projectcenter` (= `C:\QVL\deploy\projectcenter`) ; **pas d'artefact GitLab porté** (le deploy tourne sur la même machine). Un job `update-checkout` fait ensuite un `git pull --ff-only` du clone local persistant. L'ancien `npm run deploy:local` n'est plus le chemin de déploiement.
+- **Deep-links** — l'app utilise `createBrowserRouter` ; le service d'apex renvoie sur `index.html`, donc pas de repli HashRouter nécessaire.
+- **CSP en défense en profondeur** — même politique portée à deux niveaux : meta tag injecté au **build** (plugin Vite `projectcenter-csp-meta`, `apply: "build"`) et **header HTTP** côté hébergement. Directives clés (Gate sécu 2) : `default-src 'self'` ; `connect-src 'self' https://gitlab.com` (fetch docs via l'API GitLab v4) ; `img-src 'self' data: https://gitlab.com https://img.shields.io` (images des README + badges shields.io) ; `style-src 'self' 'unsafe-inline'` (MUI/emotion injectent leurs styles inline) ; `font-src 'self' data:` ; `script-src 'self'` ; `base-uri 'self'` ; `form-action 'self'` ; `object-src 'none'`. Le header HTTP ajoute `frame-ancestors 'none'` (ignoré en meta par le navigateur), `X-Content-Type-Options: nosniff`, `Referrer-Policy` et `server_tokens off`.
+- **Fichiers `deploy/nginx/*.conf` conservés mais superseded** — le repo garde encore `deploy/nginx/projectcenter.qvl-project.com.conf` de l'itération nginx d'origine ; il est **remplacé** par le service d'apex `serve-vitrine` + cloudflared et n'est plus utilisé.
 - **Police Chivo (Google Fonts) volontairement bloquée** — les hôtes Google ne sont pas whitelistés ; Chivo retombe sur la stack système sans casse fonctionnelle. Cible visée : self-host de Chivo dans canopui.
 
 ## Environnement & démarrage
 
 - Registre privé configuré via `.npmrc`.
-- Variable clé : `VITE_DOCS_BASE_URL`.
+- Variables clés : `VITE_DOCS_API_PROJECT_URL` (projet GitLab de la doc) et `VITE_DOCS_REF` (branche). Voir `docs/decisions/docs-source-gitlab-api.md`.
 - Démarrage local orchestré via l'outil **Switch** du méta-workspace [QVL-Studio](../QVL-Studio/README.md) (dossier `Tools/`).
 
 ## Liens utiles

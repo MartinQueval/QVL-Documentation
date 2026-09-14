@@ -17,16 +17,18 @@
 La Gateway assemble une chaîne de middlewares (`internal/app/app.go`), du plus externe au plus interne :
 
 1. **Correlation ID** — réutilise ou génère `X-Correlation-ID` (UUID v4).
-2. **Résolution de l'IP client** — via `trusted_proxies` / `X-Forwarded-For`.
-3. **Logs JSON** (`log/slog`) — une ligne par requête.
-4. **Rate limiting** — Token Bucket par IP (`/health` exempté), `429` au-delà.
-5. **Limite de taille de corps** — `413` au-delà de `max_body_bytes`.
-6. **Strip des en-têtes non fiables** — supprime `X-User-Id` / `X-User-Role` entrants (anti-usurpation).
-7. **CORS** — preflight `OPTIONS` et en-têtes `Allow-Origin`.
-8. **Routage par préfixe** (`http.ServeMux`) — le préfixe le plus long gagne ; `404` sinon.
-   - **Auth** (si `require_auth`) : validation du Bearer / cookie auprès de l'Authenticator.
-   - **Timeout backend** (`504` au-delà de `timeout_seconds`).
-   - **Reverse proxy** vers `destination_url` (avec `strip_prefix` éventuel).
+2. **Résolution de l'IP client** — via `trusted_proxies` / `CF-Connecting-IP` / `X-Forwarded-For` (l'entête `CF-Connecting-IP` d'un pair non fiable est supprimé, anti-usurpation).
+3. **En-têtes de sécurité HTTP** (`internal/middleware/security.go`) — posés sur toutes les réponses (voir plus bas).
+4. **Logs JSON** (`log/slog`) — une ligne par requête.
+5. **Rate limiting** — Token Bucket par IP (`/health` exempté), `429` au-delà.
+6. **Limite de taille de corps** — `413` au-delà de `max_body_bytes`.
+7. **Strip des en-têtes non fiables** — supprime `X-User-Id` / `X-User-Role` / `X-Client-IP` entrants puis repose `X-Client-IP` = IP résolue (anti-usurpation).
+8. **CORS** — preflight `OPTIONS` et en-têtes `Allow-Origin`.
+9. **Routage par préfixe** (`http.ServeMux`) — le préfixe le plus long gagne ; `404` sinon.
+   - **Blocage `/internal`** — `404` sur les chemins `/internal(/…)` après strip.
+   - **Auth** (si `require_auth`) : validation du Bearer / cookie auprès de l'Authenticator ; injection de `X-User-Id`, `X-User-Role` et `Authorization: Bearer` vers le backend.
+   - **Timeout backend** (`504` au-delà de `timeout_seconds`) — ou **levée de la deadline d'écriture** si `timeout_seconds: 0`.
+   - **Reverse proxy** vers `destination_url` (avec `strip_prefix` éventuel, `X-Forwarded-*` ajoutés).
 
 ## Configuration
 
@@ -92,10 +94,15 @@ Fichier `config.yaml` (chemin via le flag `-config`, défaut `config.yaml`). Lec
 | `/api/admin` | `http://localhost:8181` | oui | oui | `portail_admin` | Administration Authenticator |
 | `/api/drive` | `http://localhost:8182` | oui | oui | `portail_drive` | `max_body_bytes` 17825792, `timeout_seconds` 120 |
 | `/api/budgy` | `http://localhost:8183` | oui | oui | `portail_budgy` | — |
+| `/api/maloe` | `http://localhost:8191` | oui | oui | `portail_maloe` | `timeout_seconds: 0` → **aucun timeout** (SSE / streaming) |
 
 CORS autorisé pour les origines `http://localhost:3200` à `3203` (portails).
 
-Exemples de réécriture : `POST /api/auth/login` → `POST http://localhost:8181/login` ; `GET /api/drive/v1/files` → `GET http://localhost:8182/v1/files`.
+Exemples de réécriture : `POST /api/auth/login` → `POST http://localhost:8181/login` ; `GET /api/drive/files` → `GET http://localhost:8182/files` (Drive n'expose plus `/v1`).
+
+### Timeout par route et `timeout_seconds: 0`
+
+`timeout_seconds` est un pointeur en configuration : absent, la route hérite du `server.timeout_seconds` (5 s) ; à `0`, la route n'a **aucun timeout** — aucun `context.WithTimeout` n'est posé et la deadline d'écriture de la réponse est levée (`DisableWriteDeadlineMiddleware`), ce qui permet le streaming / SSE. Par sécurité, `timeout_seconds: 0` n'est accepté **que** sur une route `require_auth: true` : une connexion sans timeout ni deadline d'écriture ne doit pas être ouverte à un client non authentifié (la validation du démarrage l'impose). Seule `/api/maloe` utilise `0`.
 
 ## Authentification déléguée
 
@@ -135,6 +142,21 @@ Le corps de la réponse d'auth est limité à 64 Kio ; le client HTTP réutilise
 - **Logs JSON** sur stdout, une ligne par requête (`method`, `path`, `status`, `duration`, `bytes`, `ip`, `correlation_id`).
 - **Correlation ID** : `X-Correlation-ID` réutilisé s'il est valide (≤ 128 caractères, alphanumériques + `.`, `_`, `-`), sinon UUID v4 généré ; propagé au service d'auth et aux backends.
 - **Health check** : `GET /health` → `200 {"status":"ok"}`, répondu localement, exempté de rate limiting.
+
+## En-têtes de sécurité HTTP
+
+`SecurityHeadersMiddleware` (`internal/middleware/security.go`) pose ces en-têtes sur **toutes** les réponses :
+
+| En-tête | Valeur | Condition |
+|---|---|---|
+| `X-Content-Type-Options` | `nosniff` | toujours |
+| `X-Frame-Options` | `DENY` | toujours |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | toujours |
+| `Permissions-Policy` | `geolocation=(), microphone=(), camera=()` | toujours |
+| `Content-Security-Policy` | `frame-ancestors 'none'; base-uri 'self'; object-src 'none'` | toujours |
+| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains` | uniquement si `r.TLS != nil` |
+
+HSTS n'est donc émis que lorsque la Gateway termine elle-même le TLS ; derrière un proxy de terminaison TLS (tunnel Cloudflare) où `r.TLS` est nil, il est omis (l'en-tête doit alors être posé en amont).
 
 ## Durcissement CORS en production
 

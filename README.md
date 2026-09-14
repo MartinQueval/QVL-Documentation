@@ -74,7 +74,7 @@ In short: **fork it and run your own if you like — but the author's instance s
 | 🦊 Hosting & infrastructure | [hebergement](hebergement/README.md) |
 | 🔄 CI/CD pipeline | [pipeline](pipeline/README.md) |
 
-> 🗓️ **Decision (2026-07-23)** — added the **QVL Hobbies** documentation area, starting with the **HB-Api-Cocktail** service card and its OpenAPI spec (Go + SQLite, public read / local write). Not tied to any sprint.
+> 🗓️ **Decision (2026-07-23)** — added the **QVL Hobbies** documentation area (first card: **HB-Api-Cocktail**, Go + SQLite, public read / local write). It has since grown to **five projects**: **HB-Api-Cocktail**, **HB-Api-StatBar**, **HB-Front-StatBar**, **HB-Front-FondDeShaker** and **HB-Front-DeparteMental** (back-end APIs + React fronts). Not tied to any sprint.
 
 ## 🔀 Storage & mirroring architecture
 
@@ -105,8 +105,8 @@ flowchart LR
 Shared packages are distributed through QVL's **private npm registry**:
 
 - **📥 Registry — [`https://npm.qvl-project.com`](https://npm.qvl-project.com) (Verdaccio).** **Anonymous read** (any consumer with a matching `.npmrc` can `npm install`); **publishing is protected** — done only by the package's CI on a `vX.Y.Z` tag, authenticated with `VERDACCIO_TOKEN`.
-- **🎨 Showcase — [`https://canopui.qvl-project.com`](https://canopui.qvl-project.com).** Ladle showcase of the **CanopUI** design system (package `canopui`).
-- **🔗 Known consumers.** The **four CustHome portals** (Authenticator, Admin, Drive, Budgy) consume `canopui`, each pinning an **exact** version in its `package.json`.
+- **🎨 Showcase — [`https://canopui.qvl-project.com`](https://canopui.qvl-project.com).** Static showcase of the **CanopUI** design system (package `canopui`) — a Vite build served by `serve-vitrine.mjs`.
+- **🔗 Known consumers.** Beyond the **four CustHome portals** (Authenticator, Admin, Drive, Budgy), `canopui` is also consumed by **ProjectCenter** and the **QVL Hobbies fronts** (HB-Front-StatBar, HB-Front-FondDeShaker, HB-Front-DeparteMental). Several consumers have since moved from pinning an **exact** version to building on **`canopui@latest`** (CI auto-pull); the dated decisions below are kept as history.
 
 > 🗓️ **Decision (2026-07-07, SCRUM-304 / SCRUM-305)** — the `canopui` design system is published on the private Verdaccio registry (anonymous read); the four CustHome portals switched to the hosted `canopui@1.0.1` package (no more locally-built UI library).
 
@@ -177,7 +177,7 @@ En résumé : **forkez-le et hébergez le vôtre si vous le souhaitez — mais l
 | 🦊 Hébergement & infrastructure | [hebergement](hebergement/README.md) |
 | 🔄 Pipeline CI/CD | [pipeline](pipeline/README.md) |
 
-> 🗓️ **Décision (2026-07-23)** — ajout du domaine de documentation **QVL Hobbies**, avec en premier la fiche du service **HB-Api-Cocktail** et sa spec OpenAPI (Go + SQLite, lecture publique / écriture locale). Non rattaché à un sprint.
+> 🗓️ **Décision (2026-07-23)** — ajout du domaine de documentation **QVL Hobbies** (première fiche : **HB-Api-Cocktail**, Go + SQLite, lecture publique / écriture locale). Il compte depuis **cinq projets** : **HB-Api-Cocktail**, **HB-Api-StatBar**, **HB-Front-StatBar**, **HB-Front-FondDeShaker** et **HB-Front-DeparteMental** (APIs back-end + fronts React). Non rattaché à un sprint.
 
 ## 🔀 Architecture de stockage & mise en miroir
 
@@ -208,8 +208,8 @@ flowchart LR
 Les packages partagés sont distribués via le **registry npm privé** de QVL :
 
 - **📥 Registry — [`https://npm.qvl-project.com`](https://npm.qvl-project.com) (Verdaccio).** **Lecture anonyme** (tout consommateur avec le bon `.npmrc` peut faire `npm install`) ; **publication protégée** — réalisée uniquement par la CI du package sur un tag `vX.Y.Z`, authentifiée par `VERDACCIO_TOKEN`.
-- **🎨 Vitrine — [`https://canopui.qvl-project.com`](https://canopui.qvl-project.com).** Vitrine Ladle du design system **CanopUI** (package `canopui`).
-- **🔗 Consommateurs connus.** Les **quatre portails CustHome** (Authenticator, Admin, Drive, Budgy) consomment `canopui`, chacun épinglant une version **exacte** dans son `package.json`.
+- **🎨 Vitrine — [`https://canopui.qvl-project.com`](https://canopui.qvl-project.com).** Vitrine statique du design system **CanopUI** (package `canopui`) — un build Vite servi par `serve-vitrine.mjs`.
+- **🔗 Consommateurs connus.** Au-delà des **quatre portails CustHome** (Authenticator, Admin, Drive, Budgy), `canopui` est aussi consommé par **ProjectCenter** et les **fronts QVL Hobbies** (HB-Front-StatBar, HB-Front-FondDeShaker, HB-Front-DeparteMental). Plusieurs consommateurs sont depuis passés d'une version **exacte** épinglée à un build sur **`canopui@latest`** (auto-pull en CI) ; les décisions datées ci-dessous sont conservées comme historique.
 
 > 🗓️ **Décision (2026-07-07, SCRUM-304 / SCRUM-305)** — le design system `canopui` est publié sur le registry Verdaccio privé (lecture anonyme) ; les quatre portails CustHome ont basculé sur le package hébergé `canopui@1.0.1` (plus de librairie UI buildée localement).
 

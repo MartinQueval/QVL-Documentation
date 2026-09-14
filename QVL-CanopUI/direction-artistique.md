@@ -2,9 +2,9 @@
 
 > La **DA de référence** du design system **CanopUI** : principes, langage visuel et tokens qui régissent tous les portails de la flotte QVL. Toute nouvelle interface s'y conforme ; tout écart doit être justifié.
 
-- **Version couverte** : `canopui@2.0.1`
-- **Fondation** : wrapper **MUI 7** — les portails n'importent jamais MUI directement, uniquement `canopui`.
-- **Source de vérité des valeurs** : `src/tokens/` du dépôt CanopUI (objet TypeScript typé + CSS variables `--ch-*`).
+- **Version couverte** : `canopui@3.0.1`
+- **Fondation** : wrapper **MUI 9** — les portails n'importent jamais MUI directement, uniquement `canopui`.
+- **Source de vérité des valeurs** : `src/tokens/` du dépôt CanopUI (objet TypeScript typé + CSS variables `--canop-*`).
 - **Vitrine vivante** : [canopui.qvl-project.com](https://canopui.qvl-project.com) — démos live, code copiable, tables de props.
 
 ---
@@ -15,7 +15,7 @@ CanopUI transforme les portails en un **terrain vivant** : des surfaces en profo
 
 1. **Naturel et organique** — palette végétale (verts profonds, or, sauge), courbes douces, animations qui décélèrent comme un objet réel. Rien de mécanique ni de brutal.
 2. **Profondeur lisible** — la hiérarchie passe par l'élévation (ombres), les surfaces (`sunken` → `overlay`) et l'espace, jamais par des bordures dures ou des couleurs criardes.
-3. **Cohérence par les tokens** — aucune couleur, taille ou durée n'est écrite en dur dans un composant. Tout traverse les tokens et les variables `--ch-*`, ce qui rend le thème **surchargeable sans rebuild**.
+3. **Cohérence par les tokens** — aucune couleur, taille ou durée n'est écrite en dur dans un composant. Tout traverse les tokens et les variables `--canop-*`, ce qui rend le thème **surchargeable sans rebuild**.
 
 ---
 
@@ -66,11 +66,11 @@ Deux palettes complètes (clair / sombre), organisées par **rôles**. Un compos
 
 ### 3.2 Palette sombre (`paletteDark`)
 
-En sombre, le **vert s'inverse** : la couleur d'action devient une **menthe claire** lisible sur fond sombre. L'**or reste identique** (accent stable dans les deux modes).
+En sombre, le **vert s'éclaircit** : la couleur d'action devient un **vert menthe** lisible sur fond sombre. Depuis la **3.0**, ce `primary` a été assombri (`#62a886`, en remplacement du vert d'eau clair `#9de1c4` inchangé depuis la 1.0) pour passer le seuil de 4,5:1 du petit texte sur presque toutes les surfaces. L'**or reste identique** (accent stable dans les deux modes).
 
 | Rôle | main | light | dark | contrastText |
 |---|---|---|---|---|
-| **primary** (menthe) | `#9de1c4` | `#c2eeda` | `#6fbf9e` | `#08130d` |
+| **primary** (vert menthe) | `#62a886` | `#8bcfa9` | `#3e7d5e` | `#08130d` |
 | **secondary** | `#a9b48c` | `#c6cfad` | `#7f8a63` | `#0b0f08` |
 | **accent** (or, inchangé) | `#f4ad15` | `#f7c24f` | `#c98c0a` | `#241a03` |
 | **success** | `#81c784` | `#122b14` | `#2e7d32` | `#08130d` |
@@ -85,11 +85,11 @@ En sombre, le **vert s'inverse** : la couleur d'action devient une **menthe clai
 | Clé | Valeur |
 |---|---|
 | `background.default` | `#0c0f0d` |
-| `background.paper` | `#1b1f1c` |
-| `surface.sunken` | `#0f1210` |
-| `surface.base` | `#151815` |
-| `surface.raised` | `#1b1f1c` |
-| `surface.overlay` | `#232823` |
+| `background.paper` | `#262c27` |
+| `surface.sunken` | `#131715` |
+| `surface.base` | `#1d221e` |
+| `surface.raised` | `#262c27` |
+| `surface.overlay` | `#30372f` |
 | `divider` | `#2c322d` |
 
 **Texte (sombre)** : `primary #f3f1ec` · `secondary #b8b3a7` · `disabled #797469` · `onPrimary #08130d` · `onAccent #241a03`
@@ -105,10 +105,17 @@ En sombre, le **vert s'inverse** : la couleur d'action devient une **menthe clai
 
 ## 4. Typographie
 
-**Police** : `Chivo` (grotesque géométrique), avec repli `system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`.
+**Polices** :
+- **Corps & applicatif** : `Chivo` (grotesque géométrique), repli `system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`.
+- **Titres (`display`, `heading`)** : `Titan One` depuis la **3.0** (`fontFamilyHeading`), repli `'Chivo', system-ui, sans-serif` — c'est Chivo qui compose les titres tant que Titan One n'est pas chargé, ou pour de bon si le fichier manque.
+- **Code** : pile monospace (`fontFamilyMono`).
 
-**Poids** : `regular 400` · `medium 500` · `semibold 600` · `bold 700`
+**Poids** : `light 300` · `regular 400` · `medium 500` · `semibold 600` · `bold 700` · `extrabold 800` (échelle étendue en 3.0).
 **Interlignes** : `tight 1.15` · `snug 1.3` · `normal 1.5` · `relaxed 1.7`
+
+**Crénage optique** (`letterSpacing`) : échelle de `tightest -0.035em` (gros titres) à `wider 0.08em` (sur-titres) en passant par `none 0em` — le crénage se resserre à mesure que le corps grossit. Le thème MUI sert désormais ce crénage en plus de la taille sur `h1`–`h5`.
+
+**Variantes numériques** : le composant `Text` expose `tabularNums` (chiffres à chasse fixe) et `slashedZero` (zéro barré) via `font-feature-settings`.
 
 ### 4.1 Échelle « display » (héros, marketing)
 
@@ -136,9 +143,11 @@ En sombre, le **vert s'inverse** : la couleur d'action devient une **menthe clai
 
 ### 4.3 Titres MUI (`h1`–`h5`)
 
-Échelle modulaire (ratio ~1.333) : `h1 4.21rem` · `h2 3.158rem` · `h3 2.369rem` · `h4 1.777rem` · `h5 1.333rem`. Tous en `bold`, interligne `tight`.
+Échelle modulaire (ratio ~1.333) : `h1 4.21rem` · `h2 3.158rem` · `h3 2.369rem` · `h4 1.777rem` · `h5 1.333rem`. En **Titan One**, graisse `regular` (la police est massive par nature), interligne `tight`, crénage décroissant (`tightest` → `compact`).
 
-> Le composant `Heading` **découple** le niveau sémantique (`level`, pour l'accessibilité) de la taille visuelle (`size`).
+> Depuis la 3.0, `tokens.typography.heading.h1`–`h5` ne sont plus des chaînes de taille mais des **objets de style complets** (`fontSize`, `fontFamily`, `fontWeight`, `lineHeight`, `letterSpacing`), à l'image de `display` et `app`.
+
+> Le composant `Heading` **découple** le niveau sémantique (`level`, pour l'accessibilité) de la taille visuelle (`size`), cette dernière pouvant varier par point de rupture (`size={{ xs: 5, md: 3 }}`). Pour un texte non-titre, le composant `Text` porte les variantes applicatives (`body-*`, `label`, `caption`, `overline`, `metric`, `code`) avec `tone`, `weight` et variantes numériques.
 
 ---
 
@@ -160,13 +169,17 @@ En sombre, le **vert s'inverse** : la couleur d'action devient une **menthe clai
 
 | Token | Valeur | Usage |
 |---|---|---|
-| `xs` | `0.25rem` | Éléments fins |
-| `sm` | `0.5rem` | Badges, chips |
-| `md` | `0.75rem` | **Défaut** (borderRadius du thème) |
-| `lg` | `1rem` | Cartes |
-| `xl` | `1.375rem` | Cartes flottantes, panneaux |
-| `2xl` | `1.75rem` | Bottom-sheets (coin haut) |
+| `xs` | `0.5rem` | Éléments fins |
+| `sm` | `1rem` | Badges, chips |
+| `md` | `1.375rem` | **Défaut** (borderRadius du thème) |
+| `lg` | `1.75rem` | Cartes |
+| `xl` | `2.25rem` | Cartes flottantes, panneaux |
+| `2xl` | `2.875rem` | Bottom-sheets (coin haut) |
 | `pill` | `62.4375rem` | Formes en pilule (toggles, chips ronds) |
+
+> **Échelle élargie en 3.0.** Un squircle ne s'écarte d'un cercle que d'environ **12 % de son rayon** : en dessous d'une vingtaine de pixels la forme est indiscernable, l'échelle a donc été remontée (elle valait `0.25`→`1.75rem` sur `xs`→`2xl` en 2.x) pour que le travail des coins soit visible.
+
+> **Les coins sont des superellipses (squircles), pas de simples rectangles arrondis** (voir §11). Le passage au squircle a imposé de reconstruire **bordures et ombres** : `clip-path` découpe tout le rendu (`border` et `box-shadow` compris) et s'applique après `filter`. Les composants sont donc bâtis sur `squircleSurface`, qui peint bordure et fond sur deux calques découpés **derrière** le contenu, l'élément hôte n'étant jamais découpé (ce qui préserve les anneaux de focus tracés hors de la boîte). Le `borderRadius` de la boîte est neutralisé (`0`) : la forme vient du découpage.
 
 ### 5.3 Élévation (`shadows`, `e1`→`e5`)
 
@@ -180,7 +193,7 @@ L'élévation porte la profondeur. En **sombre**, chaque ombre ajoute un **liser
 | `e4` | `0 12px 28px …0.16` | + liseré vert 7 % |
 | `e5` | `0 20px 48px …0.22` | + liseré vert 8 % + halo |
 
-Mappées sur `theme.shadows[1..5]` — un composant écrit `elevation={3}` ou `var(--ch-shadow-e3)`, jamais une ombre en dur.
+Mappées sur `theme.shadows[1..5]` — un composant écrit `elevation={3}` ou `var(--canop-shadow-e3)`, jamais une ombre en dur.
 
 ---
 
@@ -208,15 +221,28 @@ Mappées sur `theme.shadows[1..5]` — un composant écrit `elevation={3}` ou `v
 
 ### 6.3 Règles
 
-- La brique d'animation avancée est **`motion` (motion/react, ex-Framer) v12**, **interne à CanopUI** — jamais ré-exportée aux portails.
+- La brique d'animation avancée est **`framer-motion` `^13`**, **interne à CanopUI** — jamais ré-exportée aux portails. Depuis la **3.0**, c'est une **peer dependency non optionnelle** du consommateur (elle était auparavant embarquée) : le cœur l'importe (`Navbar`, `SidePanel`, `Carousel`…), un portail qui ne l'installe pas voit sa construction casser (rupture consignée au CHANGELOG 3.0). La montée en 13 n'a qu'une rupture, l'abandon de `@emotion/is-prop-valid`, sans effet ici.
 - Toute animation passe par un token de durée + une courbe. Pas de valeurs libres.
 - **`prefers-reduced-motion: reduce`** : le thème force `animation/transition-duration: 0.01ms` globalement et `scroll-behavior: auto`. Les composants animés doivent aussi proposer un rendu statique équivalent.
 
 ---
 
-## 7. Décor — `ShapeBackground`
+## 7. Décor — `CanopyBackground` & `ShapeBackground`
 
-Fond décoratif signature : des **formes organiques vertes floutées** (cercles, triangles à angles arrondis) réparties et légèrement animées, qui donnent la sensation de « terrain vivant » sans nuire à la lisibilité.
+Deux fonds signature coexistent depuis la **3.0**.
+
+### 7.1 `CanopyBackground` — fond vidéo « canopée » (défaut depuis la 3.0)
+
+Depuis la 3.0, le **décor par défaut de `PageScaffold`** n'est plus les formes organiques mais une **scène vidéo de canopée** — une des deux (claire / sombre) selon le thème actif. C'est le rendu voulu pour les cartes translucides posées dessus (voir §11).
+
+- **Deux scènes** (`light` / `dark`), en `.webm` et `.mp4` avec poster `.jpg` — **~32 Mo au total** ; un portail qui monte `PageScaffold` **télécharge donc une vidéo de 5 à 11 Mo** là où il ne chargeait rien (rupture silencieuse consignée au CHANGELOG 3.0).
+- **Servi comme des fichiers**, pas inliné : les URL sont résolues au runtime (`canopyScenesFrom`, `resolveCanopyScene`) depuis une base publique servie par le greffon Vite `canopyVideo()` (`canopui/vite`). Sans le greffon, le fond reste noir.
+- **Repli** : `PageScaffold` reçoit une prop `background` (`"canopy"` par défaut, `"shapes"` pour l'ancien fond). `ShapeBackground` **n'est ni déprécié ni retiré**.
+- **Reduced-motion / lisibilité** : le poster tient lieu d'image fixe ; le contenu garde son contraste (l'opacité des cartes est calibrée pour la vidéo, voir §11).
+
+### 7.2 `ShapeBackground` — formes organiques (repli `background="shapes"`)
+
+Fond décoratif historique : des **formes organiques vertes floutées** (cercles, triangles à angles arrondis) réparties et légèrement animées, qui donnent la sensation de « terrain vivant » sans nuire à la lisibilité. Il sert toujours `Layout` et `EmptyState`, et reste le repli de `PageScaffold`.
 
 - **Couleur** : dérivée de `primary` (`primary.light` / `primary.main`), très floutée et discrète.
 - **Modes** : `hero` (présent, écrans d'auth / héros) et `ambient` (discret, pages denses — un peu plus présent vers le centre).
@@ -265,14 +291,16 @@ Fond décoratif signature : des **formes organiques vertes floutées** (cercles,
 
 ## 10. Thème & CSS variables
 
-Le thème est fourni par **`ChThemeProvider`** (ThemeProvider MUI + CssBaseline). `createChTheme(mode)` produit le thème pour `light` ou `dark`.
+Le thème est fourni par **`CanopThemeProvider`** (ThemeProvider MUI + CssBaseline). `createCanopTheme(mode)` produit le thème pour `light` ou `dark` (`canopTheme` est le thème clair pré-construit).
 
-- **Préfixe des variables** : `cssVarPrefix: "ch"` → toutes les variables sont **`--ch-*`** (ex. `--ch-palette-primary-main`, `--ch-shadow-e3`, `--ch-motion-ease-organic`, `--ch-radius-lg`, `--ch-spacing-md`).
-- Les composants résolvent leurs couleurs via `var(--ch-…)` **au runtime** : aucune valeur figée au rendu → **thème surchargeable sans rebuild** (dark mode, white-label : surcharger 2-3 variables dans une feuille chargée après la lib).
-- **Modes** : `useChTheme()` renvoie `{ mode, resolvedMode, setMode, toggleMode }`. `mode` = préférence (`light`/`dark`/**`system`**), `resolvedMode` = mode effectif (`system` résolu via `prefers-color-scheme`). Préférence persistée dans `localStorage` (clé `ch-theme-mode`).
+- **Préfixe des variables** : `cssVarPrefix: "canop"` → toutes les variables sont **`--canop-*`** (ex. `--canop-palette-primary-main`, `--canop-shadow-e3`, `--canop-motion-ease-organic`, `--canop-radius-lg`, `--canop-spacing-md`). **Rupture 3.0** : le préfixe passait de `--ch-*` à `--canop-*`, **sans alias** — un `var(--ch-…)` resté dans le CSS d'un portail résout dans le vide.
+- Les composants résolvent leurs couleurs via `var(--canop-…)` **au runtime** : aucune valeur figée au rendu → **thème surchargeable sans rebuild** (dark mode, white-label : surcharger 2-3 variables dans une feuille chargée après la lib).
+- **Modes** : `useCanopTheme()` renvoie `{ mode, resolvedMode, setMode, toggleMode }`. `mode` = préférence (`light`/`dark`/**`system`**), `resolvedMode` = mode effectif (`system` résolu via `prefers-color-scheme`). Préférence persistée dans `localStorage` (clé `canop-theme-mode`, ex-`ch-theme-mode` — **non migrée** en 3.0).
 - **`ThemeToggle`** : bascule **2 états** (Light / Dark) avec ombre et micro-animation ; intégré à la navigation (plus flottant sur la page).
 
-Extensions de thème notables : palette `accent` ajoutée à MUI (dispo comme `color="accent"` sur `Button`, `CircularProgress`, `LinearProgress`), `surface.{sunken,base,raised,overlay}`, `text.{onPrimary,onAccent}`. Les champs (`OutlinedInput`) ont un fond teinté `secondary.light` mélangé au papier et une bordure `primary` de 2 px.
+Extensions de thème notables : palette `accent` ajoutée à MUI (dispo comme `color="accent"` sur `Button`, `CircularProgress`, `LinearProgress`, `Slider`), `surface.{sunken,base,raised,overlay}`, `text.{onPrimary,onAccent}`. Les champs (`OutlinedInput`) ont un fond teinté `secondary.light` mélangé au papier et une bordure `primary` de 2 px ; l'encoche du label flottant est un bandeau opaque réglable par `--canop-input-notch`, et un fond de pré-remplissage navigateur est repris par `--canop-input-autofill` (3.0.1).
+
+> **MUI 9** (depuis la 3.0, il n'y a pas de MUI 8) : les **props système** de `Box`, `Stack`, `Typography`, `Grid`, `Link`, `DialogContentText` (`width`, `gap`, `color`, `display`, `bgcolor`…) passent dans `sx`. Le plancher navigateur monte à **Chrome 117, Firefox 121, Safari 17**.
 
 ---
 
@@ -280,15 +308,18 @@ Extensions de thème notables : palette `accent` ajoutée à MUI (dispo comme `c
 
 L'inventaire complet et interactif vit dans la **vitrine**. Points DA saillants :
 
-- **`Button`** — variantes `primary` (vert, action) / `secondary` / `danger` ; micro-interaction au press (`scale`, `springSoft`) ; état `loading`.
-- **`Card` / `CardGrid`** — surfaces à élévation tokenisée, variantes (`surface`, `floating`, `stat`), rayons `lg`/`xl` ; grille fluide `auto-fit`.
+- **Squircles partout** — tous les coins arrondis de la librairie sont des **superellipses** (voir §5.2), y compris les composants MUI qui dessinent leurs propres coins (`Chip`, `Tooltip`, `Alert`, `Dialog`, `OutlinedInput`, `IconButton`, `Popover`, `Badge`), traités par `styleOverrides`.
+- **`Button`** — variantes `primary` (vert, action) / `secondary` / `danger` / `text` / `ghost` ; micro-interaction au press (`scale`, `springSoft`) ; état `loading`. Les variantes sans fond (`text`, `ghost`) écrivent avec `text.primary`.
+- **`Card` / `CardGrid`** — surfaces à élévation tokenisée, variantes (`surface`, `floating`, `stat`), rayons `lg`/`xl`. Depuis la 3.0, la surface est **translucide (88 %) avec `backdrop-filter: blur`** par défaut — opacité **mesurée** pour tenir le contraste AA sur la canopée animée. Grille `auto-fit`, ou nombre de colonnes fixé par la prop `columns` (responsive) depuis la 3.0.
 - **`StatCard`** — chiffre clé (`metric`), variation, icône, fond teinté.
-- **`SegmentedControl`** — onglets exclusifs avec **indicateur glissant** (`SlidingIndicator`, `springSoft`).
-- **`Donut` / `ProgressBar` (segmentée)** — visualisations animées en `scaleX` (reduced-motion respecté).
+- **`SegmentedControl`** — onglets exclusifs avec **indicateur glissant** (`SlidingIndicator`, `springSoft`, `layoutId` partagé).
+- **`Donut` / `ProgressBar`** — visualisations animées en `scaleX` (reduced-motion respecté). `ProgressBar` a désormais deux formes de props **disjointes** : simple (`value`, `showValue`) **ou** segmentée (`segments`, `max`), portion remplie en dégradé et reflet balayant.
+- **`Carousel`** — **refonte 3.0** : carrousel indexé, **une carte à la fois** (`navigation` `arrows`/`bars`, `orientation`, `transition` `slide`/`fade`, `autoPlay`).
 - **`Navbar`** — sidebar / rail / bottom-nav selon le palier, indicateur d'onglet actif glissant partagé.
-- **`PageScaffold` / `PageContent`** — header structuré (titre / sous-titre / actions), backdrop `ShapeBackground`, entrée en fondu.
+- **`PageScaffold` / `PageContent`** — header structuré (titre / sous-titre / actions), backdrop **`CanopyBackground`** par défaut (repli `background="shapes"` sur `ShapeBackground`), entrée en fondu.
 - **`SidePanel`** — drawer latéral desktop → bottom-sheet mobile (poignée, swipe-to-close), sur `Modal` (focus trap + `Escape`).
 - **`DataTable`** — en-têtes sticky, effet de scroll, bascule en **cartes** sous `md`, colonnes `hideOnMobile`.
+- **`Map` / `SvgMap`** — carte vectorielle MapLibre GL (`canopui/map`, tuiles OpenFreeMap, repli lisible sur perte de contexte WebGL) ; carte SVG interactive (`SvgMap`, régions à `ariaLabel`).
 - **Feedback** — `Feedback` / `Toast` (`success`/`error`/`info`/`warning`), `StatusChip`, `EmptyState` (illustration `ShapeBackground` + message + action).
 
 ---
@@ -322,11 +353,11 @@ L'inventaire complet et interactif vit dans la **vitrine**. Points DA saillants 
 ## 14. Références
 
 - **Tokens (source de vérité)** : `src/tokens/` du dépôt CanopUI — `palette.ts`, `typography.ts`, `spacing.ts`, `radius.ts`, `shadows.ts`, `motion.ts`, `breakpoints.ts`.
-- **Thème** : `src/theme/createChTheme.ts` (mapping `--ch-*`, extensions MUI).
+- **Thème** : `src/theme/createCanopTheme.ts` (mapping `--canop-*`, extensions MUI), `src/theme/CanopThemeProvider.tsx`.
 - **Vitrine** : [canopui.qvl-project.com](https://canopui.qvl-project.com) — démos, props, code.
 - **Vue d'ensemble & API** : [README CanopUI](README.md).
 - **Versioning / release** : voir le README (semver, publication auto sur tag `vX.Y.Z`).
 
 ---
 
-_DA maintenue par la flotte QVL-Studio · appliquée à Authenticator, Admin, Drive et Budgy._
+_DA maintenue par la flotte QVL-Studio · la 3.0 est adoptée par CustHome et ProjectCenter._

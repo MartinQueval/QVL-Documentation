@@ -1,8 +1,8 @@
 # CH-Portail-Admin
 
-Portail d'administration de l'écosystème **CustHome** : tableau de bord de supervision, gestion des comptes utilisateurs (validation, statut, rôles, mot de passe, liste blanche d'IP) et gestion du catalogue de rôles par portail. Réservé aux administrateurs.
+Portail d'administration de l'écosystème **CustHome** : tableau de bord de supervision, gestion des comptes utilisateurs (validation, statut, rôles, mot de passe, liste des appareils reconnus) et gestion du catalogue de rôles par portail. Réservé aux administrateurs.
 
-![React](https://img.shields.io/badge/React-19-61dafb) ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6) ![Vite](https://img.shields.io/badge/Vite-7-646cff) ![canopui](https://img.shields.io/badge/canopui-1.0.1-lightgrey) ![Express](https://img.shields.io/badge/Express-5-000000)
+![React](https://img.shields.io/badge/React-19-61dafb) ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6) ![Vite](https://img.shields.io/badge/Vite-7-646cff) ![canopui](https://img.shields.io/badge/canopui-latest-lightgrey) ![Express](https://img.shields.io/badge/Express-5-000000)
 
 ## Stack
 
@@ -29,8 +29,8 @@ Toutes les routes (hors `/forbidden`) sont protégées par la garde **`RequireAd
 | --- | --- | --- | --- |
 | `/forbidden` | `Forbidden` | Aucune | Accès refusé + bouton pour changer de compte (retour login) |
 | `/` | — | `RequireAdmin` (`admin`) | Redirige vers `/dashboard` |
-| `/dashboard` | `Dashboard` | `RequireAdmin` (`admin`) | Interrupteur d'activation des inscriptions, carte de trafic (`TrafficCard`) et table des comptes en attente de validation (approuver / supprimer) |
-| `/users` | `Users` | `RequireAdmin` (`admin`) | Table de tous les utilisateurs (recherche, statut, rôles portail) ; panneau latéral d'édition : profil, mot de passe, rôles (`UserRolesEditor`), liste blanche d'IP (`AllowedIpsList`), activation/désactivation, suppression |
+| `/dashboard` | `Dashboard` | `RequireAdmin` (`admin`) | Cartes de statistiques par statut (`DashboardStats`), interrupteur d'activation des inscriptions (`RegistrationToggleCard`), carte de trafic (`TrafficCard`) et carte des comptes en attente de validation (`PendingUsersCard`, affichée uniquement s'il en existe : approuver / supprimer) |
+| `/users` | `Users` | `RequireAdmin` (`admin`) | Table de tous les utilisateurs (recherche, statut, rôles portail) ; panneau latéral d'édition : profil, mot de passe, rôles (`UserRolesEditor`), liste des appareils reconnus (`UserDevicesList`) avec révocation d'un appareil et restriction aux appareils reconnus (`whitelist_only`), activation/désactivation, suppression |
 | `/roles` | `Roles` | `RequireAdmin` (`admin`) | Grille de cartes par portail (`admin`, `drive`, `budgy`, `home`) permettant d'ajouter/supprimer des sous-rôles |
 | `*` | — | `RequireAdmin` (`admin`) | Redirige vers `/dashboard` |
 
@@ -49,7 +49,7 @@ Client canopui `createApiClient({ basePath: "/api", withRefresh: true })` ; deux
 | Domaine | Endpoints (extraits) |
 | --- | --- |
 | Session | `/auth/me`, `/auth/logout` |
-| Utilisateurs | `/admin/users` (GET, liste paginée + filtres), `/admin/users/:id` (PUT/DELETE), `/admin/users/:id/status`, `/admin/users/:id/roles`, `/admin/users/:id/password`, `/admin/users/:id/whitelist` |
+| Utilisateurs | `/admin/users` (GET, liste paginée + filtres), `/admin/users/:id` (PUT/DELETE), `/admin/users/:id/status`, `/admin/users/:id/roles`, `/admin/users/:id/password`, `/admin/users/:id/whitelist` (PUT, bascule le flag `whitelist_only`), `/admin/users/:id/devices/:deviceId` (DELETE, révoque un appareil reconnu) |
 | Paramètres | `/admin/settings/registration` (GET/PUT) |
 | Analytics | `/admin/analytics/traffic?period=` (day/week/month/year) |
 | Rôles | `/admin/roles` (GET/POST), `/admin/roles/:id` (DELETE) |
@@ -81,7 +81,8 @@ Voir la documentation de l'API : [../CH-Api-Authenticator/README.md](../CH-Api-A
 
 - **Garde à deux niveaux implicite** : `RequireAdmin` (via `RouteGuard`) distingue le cas non authentifié (401 → login) du cas authentifié sans rôle (`/forbidden`).
 - **Catalogue de rôles par portail** : les rôles sont organisés par portail (`admin`, `drive`, `budgy`, `home`) et par nature (`portal` / `sub`) ; la page Rôles ne gère que les sous-rôles.
-- **Gestion fine des comptes** : validation des comptes en attente, activation/désactivation, réinitialisation de mot de passe, liste blanche d'IP, attribution de rôles depuis un panneau latéral.
+- **Gestion fine des comptes** : validation des comptes en attente, activation/désactivation, réinitialisation de mot de passe, gestion des appareils reconnus (révocation, restriction via le flag `whitelist_only`), attribution de rôles depuis un panneau latéral.
+- **Dépendance canopui non épinglée en pratique** : `package.json` déclare une borne (`^2.2.0`), mais le job `build` de la CI exécute `npm install canopui@latest` avant de builder — l'artefact déployé embarque toujours la dernière version publiée (d'où le badge `canopui-latest`).
 
 ## Incohérences relevées
 

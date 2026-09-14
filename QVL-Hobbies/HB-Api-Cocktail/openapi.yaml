@@ -7,17 +7,25 @@ info:
 
     Contenu textuel des recettes en anglais.
 
-    Deux familles d'endpoints :
+    Trois familles d'endpoints :
       - Lecture publique : consultation et recherche des cocktails et referentiels.
+      - Preferences (tag `preferences`) : bar et favoris de l'utilisateur, portes
+        integralement par des cookies poses et relus par le serveur. Le service
+        reste sans etat : il ne stocke rien, il n'y a ni base ni compte utilisateur.
       - Ecriture locale (tag `local`) : ajout d'une recette et upload d'image,
         joignable uniquement en loopback 127.0.0.1 et protege par un token.
 
     Ce document decrit l'integralite de la surface v1, entierement implementee et
     exposee : lecture et recherche des cocktails, referentiels, service d'images,
-    ecriture locale et sonde de disponibilite.
+    preferences utilisateur, ecriture locale et sonde de disponibilite.
 servers:
   - url: http://127.0.0.1:8080
-    description: Service local
+    description: |
+      Service local (placeholder). En production l'API ecoute sur
+      127.0.0.1:8310 (unite systemd hb-api-cocktail), exposee derriere
+      Cloudflare Tunnel sous https://api-cocktail.qvl-project.com.
+  - url: https://api-cocktail.qvl-project.com
+    description: Production (Cloudflare Tunnel)
 tags:
   - name: public
     description: Lecture publique des cocktails et de la recherche.
@@ -25,6 +33,11 @@ tags:
     description: Referentiels de lecture publique (ingredients, categories, tags).
   - name: images
     description: Service d'images des cocktails.
+  - name: preferences
+    description: |
+      Bar et favoris de l'utilisateur, portes integralement par des cookies
+      poses et relus par le serveur. Le service ne stocke rien : aucune base,
+      aucun compte, aucun identifiant de session.
   - name: local
     description: |
       Ecriture locale non publique. Joignable uniquement en loopback (127.0.0.1)
@@ -71,7 +84,7 @@ paths:
                         tags: [iba, sour, tequila]
                         ingredients:
                           - { name: Lime juice, quantity: '15', unit: ml }
-                          - { name: Salt, quantity: '', unit: rim }
+                          - { name: Salt, quantity: '', unit: rim, garnish: true }
                           - { name: Tequila, quantity: '50', unit: ml }
                           - { name: Triple sec, quantity: '20', unit: ml }
                       - id: 4
@@ -87,7 +100,7 @@ paths:
                         ingredients:
                           - { name: Angostura bitters, quantity: '2', unit: dashes }
                           - { name: Bourbon, quantity: '60', unit: ml }
-                          - { name: Orange peel, quantity: '1', unit: piece }
+                          - { name: Orange peel, quantity: '1', unit: piece, garnish: true }
                           - { name: Sugar, quantity: '1', unit: cube }
                     total: 2
                     limit: 20
@@ -111,7 +124,9 @@ paths:
         description: |
           Requete `multipart/form-data` a deux parts :
             - `cocktail` (obligatoire) : recette serialisee en JSON, conforme a
-              `CocktailInput`. Les champs inconnus sont refuses.
+              `CocktailInput`. Les champs inconnus sont refuses. Chaque
+              ingredient peut porter `garnish`, et un nom d'ingredient repete
+              dans la meme recette est refuse en `400`.
             - `image` (optionnelle) : fichier binaire jpeg, png ou webp, valide
               sur le contenu reel du fichier, taille maximale 2 Mo. Le nom du
               fichier stocke est genere par le serveur (`{id}.{ext}`).
@@ -150,6 +165,7 @@ paths:
                     ingredients:
                       - { name: Campari, quantity: '30', unit: ml }
                       - { name: Gin, quantity: '30', unit: ml }
+                      - { name: Orange peel, quantity: '1', unit: piece, garnish: true }
                       - { name: Sweet vermouth, quantity: '30', unit: ml }
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -169,6 +185,8 @@ paths:
         Recherche les cocktails contenant les ingredients fournis.
         Le parametre `match` controle la strategie : `all` exige tous les
         ingredients (defaut), `any` en exige au moins un.
+        Le marqueur `garnish` n'influence pas la correspondance : une garniture
+        reste un ingredient recherchable.
       operationId: searchCocktails
       security: []
       parameters:
@@ -280,7 +298,7 @@ paths:
                     tags: [iba, sour, tequila]
                     ingredients:
                       - { name: Lime juice, quantity: '15', unit: ml }
-                      - { name: Salt, quantity: '', unit: rim }
+                      - { name: Salt, quantity: '', unit: rim, garnish: true }
                       - { name: Tequila, quantity: '50', unit: ml }
                       - { name: Triple sec, quantity: '20', unit: ml }
         '400':
@@ -396,6 +414,116 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /preferences:
+    get:
+      tags: [preferences]
+      summary: Lire le bar et les favoris de l'utilisateur
+      description: |
+        Relit les cookies `hb_bar` et `hb_fav` et renvoie l'etat complet.
+
+        Le service ne stocke rien : les donnees vivent integralement dans les
+        cookies. Un cookie absent, illisible ou corrompu donne une liste vide,
+        jamais une erreur.
+
+        Chaque cookie effectivement lisible est repose avec un `Max-Age` neuf :
+        la duree de vie est une fenetre glissante depuis la derniere visite, et
+        non depuis la derniere modification. Aucun cookie n'est pose pour un
+        visiteur qui n'en a pas, ni pour un cookie dont le marqueur de schema
+        est inconnu : la lecture n'a pas d'effet de bord.
+      operationId: getPreferences
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/BarCookie'
+        - $ref: '#/components/parameters/FavoritesCookie'
+      responses:
+        '200':
+          description: |
+            Etat courant. Les deux tableaux sont toujours presents et jamais
+            `null`. En-tete `Cache-Control: no-store` : reponse propre a un
+            utilisateur, jamais mutualisable.
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/PreferencesSetCookie'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preferences'
+              examples:
+                stored:
+                  summary: Cookies presents et lisibles
+                  value:
+                    bar: [12, 45]
+                    favorites: [3, 7]
+                empty:
+                  summary: Aucun cookie, ou cookies corrompus
+                  value:
+                    bar: []
+                    favorites: []
+    put:
+      tags: [preferences]
+      summary: Remplacer le bar et les favoris de l'utilisateur
+      description: |
+        Remplace l'etat complet. L'operation est idempotente et rejouable :
+        le meme corps produit le meme etat et les memes cookies.
+
+        Les deux champs sont obligatoires : un champ optionnel rendrait ambigu
+        "absent = inchange ou = vide". Vider une liste se fait avec un tableau
+        vide, ce qui supprime le cookie correspondant : il n'existe ni `PATCH`,
+        ni `DELETE`, ni endpoint par element.
+
+        Les champs inconnus sont refuses, et les noms de champs sont sensibles
+        a la casse : `Bar`, `BAR` ou `Favorites` sont refuses au meme titre que
+        n'importe quel champ inconnu.
+
+        Les identifiants ne sont pas croises avec le referentiel : aucune
+        verification d'existence n'est faite ici. Le client possede deja le
+        catalogue et realise ce croisement a cout nul.
+      operationId: replacePreferences
+      security: []
+      requestBody:
+        required: true
+        description: Etat complet a persister dans les cookies.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreferencesInput'
+            examples:
+              replace:
+                summary: Bar et favoris
+                value:
+                  bar: [12, 45]
+                  favorites: [3, 7]
+              clear:
+                summary: Tout vider (supprime les deux cookies)
+                value:
+                  bar: []
+                  favorites: []
+      responses:
+        '200':
+          description: |
+            Etat normalise : doublons retires, ordre de soumission conserve.
+            Les cookies correspondants sont poses dans la meme reponse.
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/PreferencesSetCookie'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preferences'
+              examples:
+                normalized:
+                  summary: Doublons retires
+                  value:
+                    bar: [12, 45]
+                    favorites: [3, 7]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /health:
     get:
       tags: [system]
@@ -487,6 +615,51 @@ components:
         type: integer
         minimum: 0
         default: 0
+    BarCookie:
+      name: hb_bar
+      in: cookie
+      required: false
+      description: |
+        Ingredients du bar, au format `v1.<id>.<id>`. Absent quand la liste est
+        vide. Envoye automatiquement par le navigateur ; le cookie est
+        `HttpOnly` et n'est donc pas lisible en JavaScript.
+      schema:
+        type: string
+      example: v1.12.45
+    FavoritesCookie:
+      name: hb_fav
+      in: cookie
+      required: false
+      description: |
+        Cocktails favoris, au format `v1.<id>.<id>`. Absent quand la liste est
+        vide. Envoye automatiquement par le navigateur ; le cookie est
+        `HttpOnly` et n'est donc pas lisible en JavaScript.
+      schema:
+        type: string
+      example: v1.3.7
+  headers:
+    PreferencesSetCookie:
+      description: |
+        Un en-tete par liste non vide (`hb_bar`, `hb_fav`), deux en-tetes
+        distincts : budgets independants et corruption isolee.
+
+        Attributs poses : `Max-Age=31536000`, `Path=/`, `HttpOnly`,
+        `SameSite=Lax`, pas d'attribut `Domain` (cookie host-only). `Secure`
+        est derive du protocole de la requete (TLS ou `X-Forwarded-Proto`) et
+        jamais d'une variable de build : un cookie `Secure` pose en http est
+        rejete silencieusement par le navigateur.
+
+        Une liste vide n'ecrit pas `v1.` seul : le cookie est supprime
+        (`Max-Age=0`).
+      schema:
+        type: string
+      example: hb_bar=v1.12.45; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax
+    NoStore:
+      description: Reponse propre a un utilisateur, jamais mutualisable.
+      schema:
+        type: string
+        enum: [no-store]
+      example: no-store
   schemas:
     Cocktail:
       type: object
@@ -543,6 +716,17 @@ components:
         unit:
           type: string
           example: ml
+        garnish:
+          type: boolean
+          description: |
+            Present et vrai uniquement quand l'ingredient est une garniture ou
+            un element trivial de cette recette, absent sinon. Le role appartient
+            a la liaison cocktail-ingredient : un meme ingredient peut etre
+            garniture dans une recette et composant dans une autre. Un client qui
+            calcule les cocktails realisables avec son bar ignore les ingredients
+            portant ce marqueur.
+          enum: [true]
+          example: true
     CocktailList:
       type: object
       required: [items, total, limit, offset]
@@ -593,6 +777,7 @@ components:
               - { name: Gin, quantity: '30', unit: ml }
               - { name: Campari, quantity: '30', unit: ml }
               - { name: Sweet vermouth, quantity: '30', unit: ml }
+              - { name: Orange peel, quantity: '1', unit: piece, garnish: true }
         image:
           type: string
           format: binary
@@ -647,6 +832,54 @@ components:
         unit:
           type: string
           example: ml
+        garnish:
+          type: boolean
+          default: false
+          description: |
+            Marque l'ingredient comme garniture ou element trivial de cette
+            recette. Absent ou `false`, l'ingredient est un composant. Le role
+            appartient a la liaison : le meme ingredient peut etre garniture
+            dans une recette et composant dans une autre. Un nom d'ingredient
+            declare deux fois dans la meme recette est refuse en `400`, jamais
+            perdu silencieusement.
+          example: true
+    Preferences:
+      type: object
+      required: [bar, favorites]
+      description: |
+        Etat complet des preferences. Les deux tableaux sont toujours presents,
+        jamais `null`, sans doublon et plafonnes a 300 elements.
+      properties:
+        bar:
+          $ref: '#/components/schemas/PreferenceIdList'
+        favorites:
+          $ref: '#/components/schemas/PreferenceIdList'
+    PreferencesInput:
+      type: object
+      required: [bar, favorites]
+      additionalProperties: false
+      description: |
+        Etat complet a persister. Les deux champs sont obligatoires et les
+        champs inconnus sont refuses. Les noms de champs sont sensibles a la
+        casse : seuls `bar` et `favorites` sont reconnus.
+      properties:
+        bar:
+          $ref: '#/components/schemas/PreferenceIdList'
+        favorites:
+          $ref: '#/components/schemas/PreferenceIdList'
+    PreferenceIdList:
+      type: array
+      maxItems: 300
+      description: |
+        Identifiants entiers, sans croisement avec le referentiel. Un
+        depassement de 300 elements est refuse par un `400`, jamais tronque
+        silencieusement.
+      items:
+        type: integer
+        format: int64
+        minimum: 1
+        maximum: 999999999
+      example: [12, 45]
     HealthStatus:
       type: object
       required: [status]
@@ -717,11 +950,38 @@ components:
               value:
                 error: bad_request
                 message: name is required
+            duplicateIngredient:
+              summary: Nom d'ingredient declare deux fois dans la recette (POST)
+              value:
+                error: bad_request
+                message: ingredient name is duplicated
             unsupportedImage:
               summary: Contenu d'image non jpeg/png/webp (POST)
               value:
                 error: bad_request
                 message: unsupported image type
+            missingPreferencesField:
+              summary: Champ obligatoire absent ou null (PUT /preferences)
+              value:
+                error: bad_request
+                message: favorites is required
+            invalidPreferencesPayload:
+              summary: |
+                Corps JSON invalide, champ inconnu, ou variante de casse d'un
+                champ connu (PUT /preferences)
+              value:
+                error: bad_request
+                message: invalid preferences payload
+            preferencesListTooLong:
+              summary: Plus de 300 elements dans une liste (PUT /preferences)
+              value:
+                error: bad_request
+                message: bar must not exceed 300 entries
+            preferencesIdOutOfRange:
+              summary: Identifiant hors bornes (PUT /preferences)
+              value:
+                error: bad_request
+                message: bar must contain integers between 1 and 999999999
     Unauthorized:
       description: Token d'ecriture locale manquant ou invalide.
       content:
@@ -748,8 +1008,9 @@ components:
                 message: forbidden
     PayloadTooLarge:
       description: |
-        Charge utile trop volumineuse. L'image depasse 2 Mo ou le corps
-        multipart global depasse la limite acceptee.
+        Charge utile trop volumineuse. L'image depasse 2 Mo, le corps multipart
+        global depasse la limite acceptee, ou le corps JSON de
+        `PUT /preferences` depasse 16 Kio.
       content:
         application/json:
           schema:

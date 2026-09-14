@@ -13,7 +13,7 @@ Il est exposé par [CH-Api-GateWay](../CH-Api-GateWay/README.md) sous le préfix
 - **Source bancaire** : adaptateur `mock` ou `enablebanking` (API Enable Banking)
 - **Auth** : JWT HS256 validé localement, rôle `budgy` requis
 - **Bus** : abonnement MQTT (Relay) aux événements (ex. suppression d'utilisateur → effacement) et worker de synchronisation
-- **Version** : 0.1.0
+- **Version** : v1.0.2 (tag Git ; `Cargo.toml` porte encore `0.1.0`)
 
 ## Port par défaut
 
@@ -27,7 +27,9 @@ Il est exposé par [CH-Api-GateWay](../CH-Api-GateWay/README.md) sous le préfix
 - **Comptes bancaires** : IBAN masqué, devise, solde optionnel (montant en centimes, type `available`/`booked`/`expected`).
 - **Transactions** : libellé, montant en centimes, devise, statut (`booked`/`pending`), dates de comptabilisation et de valeur. Chaque transaction expose aussi son **`clean_label`** : le tiers extrait du libellé bancaire (marchand ou contrepartie), débarrassé des préfixes d'opération, dates, masques de carte et références. C'est cette forme stable — et non le libellé brut, qui change chaque mois — qui sert à l'affichage, au matching des règles et au regroupement des récurrences.
 - **Catégorisation** : `categorization_source` vaut `manual`, `rule` ou `none`. Les traitements automatiques ne touchent **que** les transactions en `none` : un choix manuel n'est jamais réécrit.
-- **Virements internes** : un mouvement entre deux comptes du même propriétaire, apparié automatiquement (même montant, comptes différents, ±4 jours). Ni dépense ni revenu — sans quoi il serait compté deux fois. Exclu de tous les agrégats.
+- **Virements internes** : un mouvement entre deux comptes du même propriétaire, apparié automatiquement. Ni dépense ni revenu — sans quoi il serait compté deux fois — donc exclu de tous les agrégats. La transaction expose alors `is_internal_transfer: true` (affiché « Virement interne, non compté » côté portail). L'appariement est décrit plus bas (v1.0.2).
+- **Enveloppes** : « budgets » libres et manuels, indépendants d'un mois ou d'une catégorie (suivre un projet : vacances, achat…). L'utilisateur y affecte manuellement des transactions ; aucune règle n'affecte automatiquement une enveloppe. Une enveloppe porte un nom (≤ 30 caractères), une icône, une couleur et un `montant_cents` cible, et l'API renvoie la consommation calculée (`depense_cents`, `restant_cents`, `pourcentage_consomme`, `depasse`, `nombre_transactions`). À distinguer des **budgets** mensuels par catégorie.
+- **Préférences — jour de départ du mois** : le cycle budgétaire est réglable via `jour_debut_mois` (1 à 31, défaut `1`). Un jour > 1 décale le cycle sur le mois calendaire précédent (ex. jour 28 → le cycle « août » court du 28 juillet au 27 août) ; un jour comme 31 est ramené au dernier jour existant du mois. Un cycle porte le nom du mois de son **dernier** jour.
 - **Worker de synchronisation** (optionnel) : rafraîchit périodiquement comptes et transactions dans une fenêtre glissante, avec quota journalier. Le premier cycle part immédiatement au démarrage du service.
 
 ## Configuration
@@ -82,6 +84,7 @@ Toutes les routes applicatives sont sous le préfixe **`/v1`** et exigent un JWT
 | POST | `/accounts/{account_id}/transactions/{transaction_id}/rule` | JWT budgy | Crée une règle **dérivée du libellé** de la transaction, puis l'applique rétroactivement | 201, 400, 401, 403, 404 |
 | GET | `/transactions` | JWT budgy | Transactions du propriétaire tous comptes confondus (filtres `account_id`, `category_id`, `from`/`to`, `type` ; tri `date`/`amount`) | 200, 400, 401, 403 |
 | POST | `/transactions/recategoriser` | JWT budgy | Réconciliation idempotente : virements internes → règles → crédits | 200, 401, 403 |
+| PUT | `/transactions/{transaction_id}/enveloppe` | JWT budgy | Affecte/retire une transaction d'une enveloppe (corps `{ enveloppe_id }`, `null` = retirer) | 204, 400, 401, 403, 404 |
 | GET | `/balance` | JWT budgy | Solde consolidé tous comptes, avec solde à venir si la banque l'expose | 200, 401, 403 |
 | GET | `/categories` | JWT budgy | Catégories système et propres au propriétaire | 200, 401, 403 |
 | POST | `/categories` | JWT budgy | Crée une catégorie | 201, 400, 401, 403, 409 |
@@ -91,6 +94,12 @@ Toutes les routes applicatives sont sous le préfixe **`/v1`** et exigent un JWT
 | GET | `/budgets` | JWT budgy | Budgets mensuels par catégorie (`mois=YYYY-MM`) | 200, 400, 401, 403 |
 | POST | `/budgets` | JWT budgy | Crée ou met à jour le budget d'une catégorie pour un mois | 201, 400, 401, 403, 404 |
 | GET | `/budgets/remaining` | JWT budgy | Reste à dépenser par catégorie (`month=YYYY-MM`), budgété ou prédit | 200, 400, 401, 403 |
+| GET | `/preferences` | JWT budgy | Préférences du propriétaire (dont `jour_debut_mois`) | 200, 401, 403 |
+| PUT | `/preferences` | JWT budgy | Met à jour les préférences (`jour_debut_mois` : 1 à 31) | 200, 400, 401, 403 |
+| GET | `/enveloppes` | JWT budgy | Liste des enveloppes avec consommation calculée | 200, 401, 403 |
+| POST | `/enveloppes` | JWT budgy | Crée une enveloppe | 201, 400, 401, 403 |
+| PUT | `/enveloppes/{enveloppe_id}` | JWT budgy | Modifie une enveloppe | 200, 400, 401, 403, 404 |
+| DELETE | `/enveloppes/{enveloppe_id}` | JWT budgy | Supprime une enveloppe | 204, 401, 403, 404 |
 | GET | `/expenses/by-category` | JWT budgy | Dépenses du mois réparties par catégorie | 200, 400, 401, 403 |
 | GET | `/forecast` | JWT budgy | Budget prévisionnel du mois | 200, 400, 401, 403 |
 | GET | `/banks` | JWT budgy | Liste des établissements bancaires disponibles | 200, 401, 403 |
@@ -126,6 +135,19 @@ Le `total` du reste à dépenser est **exactement la somme des lignes renvoyées
 Les revenus du prévisionnel viennent de la **médiane des crédits mensuels par catégorie de revenu**, et non de la détection de récurrence. Celle-ci exige un montant fixe (±1 €) et un tiers identique : un salaire, qui varie de plusieurs dizaines d'euros et porte le mois dans son libellé, ne peut structurellement pas être reconnu. Un crédit rangé dans une catégorie de dépense est un remboursement et ne compte pas comme revenu. Les crédits sont exclus du calcul par récurrence, sous peine d'être comptés deux fois.
 
 Les **dépenses** récurrentes, elles, restent détectées par occurrences à montant fixe (≥ 3 occurrences, intervalles de 26 à 35 jours) : le modèle convient aux abonnements et charges.
+
+### Appariement des virements internes (v1.0.2)
+
+L'ancienne heuristique — « même montant, comptes différents, appariés au premier crédit venu dans une fenêtre de ±4 jours » — appariait parfois la mauvaise face : deux débits de 200 € face à un seul crédit de 200 € sortaient à tort une épargne des totaux ; un virement de 10 € vers un tiers se mariait à un bonus de 10 € le lendemain, effaçant silencieusement à la fois une dépense et un revenu.
+
+La logique actuelle **classe les couples candidats par ressemblance de libellé** :
+
+1. On forme **tous** les couples débit/crédit plausibles : comptes différents, montants exactement opposés, écart de dates ≤ **4 jours** (`TOLERANCE_JOURS`).
+2. Chaque couple est noté par une **similarité de Jaccard** sur les mots des libellés (intersection / union, en majuscules).
+3. Les couples sont triés par similarité décroissante (avec départages déterministes par date puis identifiants, pour un résultat indépendant de l'ordre de lecture en base), puis acceptés gloutonnement — une face déjà consommée est ignorée.
+4. Un couple dont le score est inférieur à `RESSEMBLANCE_MINIMALE` (= **0.25**) est **refusé**, sauf s'il est le seul appariement possible des deux côtés et qu'aucune des deux transactions n'a été rangée à la main (garde-fou anti-coïncidence de montant ambiguë ; la catégorisation manuelle est un indice, pas un veto).
+
+Les transactions ainsi appariées portent `is_internal_transfer: true` et sont exclues de tous les agrégats.
 
 ## Pagination
 

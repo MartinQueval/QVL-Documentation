@@ -4,12 +4,13 @@ info:
   description: >-
     Microservice Drive CustHome : fichiers arborescents, galerie média, corbeille,
     upload direct et par chunks, quotas et administration.
-  version: 0.1.0
+    Les routes sont servies à la racine (préfixe /v1 abandonné le 2026-07-22).
+  version: 1.0.0
 servers:
-  - url: http://localhost:8182/v1
-    description: Accès direct
-  - url: http://localhost:8180/api/drive/v1
-    description: Via la Gateway
+  - url: http://localhost:8182
+    description: Accès direct (routes à la racine, sans préfixe de version)
+  - url: http://localhost:8180/api/drive
+    description: Via la Gateway (strip_prefix)
 tags:
   - name: Stockage
   - name: Fichiers
@@ -358,7 +359,7 @@ paths:
   /files/{id}/thumbnail:
     get:
       tags: [Fichiers]
-      summary: Vignette JPEG
+      summary: Vignette JPEG (images, PDF, vidéos)
       parameters:
         - in: path
           name: id
@@ -369,6 +370,57 @@ paths:
       responses:
         '200':
           description: Vignette
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /files/{id}/preview:
+    get:
+      tags: [Fichiers]
+      summary: Nombre de pages d'un aperçu PDF
+      description: Réservé aux fichiers `application/pdf` (404 sinon).
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Nombre de pages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pages:
+                    type: integer
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /files/{id}/preview/{page}:
+    get:
+      tags: [Fichiers]
+      summary: Rendu JPEG d'une page de PDF
+      description: Rasterise la page demandée via `pdftoppm` (cache disque). PDF uniquement.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: page
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Page rendue
           content:
             image/jpeg:
               schema:

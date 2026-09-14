@@ -2,7 +2,7 @@
 
 Portail de stockage de fichiers de l'écosystème **CustHome** : explorateur de fichiers et dossiers (upload, import de dossier, renommage, déplacement, corbeille), galerie média groupée par mois avec visionneuse, et console d'administration des quotas. Réservé aux utilisateurs disposant du rôle Drive.
 
-![React](https://img.shields.io/badge/React-19-61dafb) ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6) ![Vite](https://img.shields.io/badge/Vite-7-646cff) ![canopui](https://img.shields.io/badge/canopui-1.0.1-lightgrey) ![Express](https://img.shields.io/badge/Express-5-000000)
+![React](https://img.shields.io/badge/React-19-61dafb) ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6) ![Vite](https://img.shields.io/badge/Vite-7-646cff) ![canopui](https://img.shields.io/badge/canopui-latest-lightgrey) ![Express](https://img.shields.io/badge/Express-5-000000)
 
 ## Stack
 
@@ -85,6 +85,17 @@ Voir la documentation de l'API : [../CH-Api-Drive/README.md](../CH-Api-Drive/REA
 - **Corbeille** : la même page `Files` sert `/files` et `/trash` (prop `trash`), avec actions différenciées (restauration / purge / vidage complet).
 - **Galerie** : regroupement des médias par mois (à partir de `taken_at` ou `created_at`), vignettes servies par l'API, visionneuse `Lightbox`, badge pour les vidéos.
 - **UX riche** : glisser-déposer de fichiers, import de dossiers (`webkitdirectory`), sélection multiple avec actions groupées, vues liste/grille persistées, `StorageBar` de suivi du quota dans la barre latérale.
+
+### Vague d'août 2026 (uploads & prévisualisation)
+
+- **Upload par morceaux** : les gros fichiers (jusqu'à 10 Gio côté API) sont découpés et envoyés par blocs de 16 Mio, au lieu d'un seul corps de requête.
+- **File d'attente d'upload** : suivi compact porté par le layout (toast en haut), avec **pause / reprise**, **saut des fichiers déjà présents**, reprise des échecs, et **garde-fou à la fermeture** de l'onglet tant qu'un transfert est en cours.
+- **Visionneuse PDF page par page** (desktop et mobile) et bouton « tout sélectionner ».
+- **Prévisualisation images & PDF** directement sur les cartes de fichiers (la vignette s'affiche dès qu'elle existe) ; placeholder de recherche raccourci sur mobile.
+- **Sélection par appui long** sur les cartes (mobile), sans case à cocher.
+- **Galerie** : les vidéos se **lisent** désormais dans la visionneuse au lieu d'afficher un cadre vide.
+
+> Modèle CanopUI : le `package.json` fixe une borne (lockfile épinglé récemment à `2.8.0`), mais la CI build sur `canopui@latest` — d'où le badge `canopui-latest`. Ce portail suit encore la ligne CanopUI 2.x (socle **MUI 7**).
 
 ## Incohérences relevées
 

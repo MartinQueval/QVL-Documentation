@@ -4,7 +4,7 @@ info:
   description: >-
     Microservice d'authentification multi-portail de l'écosystème CustHome.
     Gestion des comptes, rôles par portail, JWT HS256, sessions et administration.
-  version: 0.1.0
+  version: 1.0.0
 servers:
   - url: http://localhost:8181/v1
     description: Accès direct (préfixe versionné)
@@ -39,7 +39,11 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     Forbidden:
-      description: Accès refusé
+      description: >-
+        Accès refusé. Le champ `error` distingue : `forbidden` (rôle/portail
+        inconnu/aucun rôle), `account_pending` (compte en attente de validation),
+        `account_disabled` (compte désactivé), `device_not_allowed` (appareil non
+        autorisé sur un compte `whitelist_only`).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -129,13 +133,39 @@ components:
           enum: [pending_validation, active, disabled]
         whitelist_only:
           type: boolean
-        allowed_ips:
+        devices:
           type: array
+          description: >-
+            Appareils reconnus de l'utilisateur (modèle par appareil `ch_device`,
+            remplace l'ancienne liste d'adresses IP). Triés du plus récemment vu
+            au plus ancien.
           items:
-            type: string
+            $ref: '#/components/schemas/Device'
         created_at:
           type: string
           format: date-time
+    Device:
+      type: object
+      description: >-
+        Appareil reconnu. Le hash du secret du cookie `ch_device` n'est jamais
+        exposé.
+      properties:
+        id:
+          type: string
+          description: Identifiant public de l'appareil (utilisé pour la révocation).
+        label:
+          type: string
+          example: Chrome sur Windows
+        first_seen:
+          type: string
+          format: date-time
+        last_seen:
+          type: string
+          format: date-time
+        last_ip:
+          type: string
+          nullable: true
+          description: Dernière IP observée, purement indicative (ne participe pas à l'autorisation).
     UserListResponse:
       type: object
       properties:
@@ -158,7 +188,7 @@ components:
           type: string
         portal:
           type: string
-          enum: [admin, drive, home, budgy]
+          enum: [admin, drive, home, budgy, maloe]
         kind:
           type: string
           enum: [portal, sub]
@@ -274,6 +304,10 @@ paths:
         - in: header
           name: X-Client-IP
           required: false
+          description: >-
+            Chemin legacy : consulté uniquement si le jeton porte encore un claim
+            `ip` (épinglage réseau des anciens jetons). Les jetons émis
+            actuellement n'ont plus de claim `ip` ; ce header n'est alors pas utilisé.
           schema:
             type: string
       responses:
@@ -392,8 +426,8 @@ paths:
     get:
       tags: [Administration]
       summary: État de l'inscription publique
-      security:
-        - bearerAuth: []
+      description: Route publique (aucune authentification requise).
+      security: []
       responses:
         '200':
           description: État
@@ -625,7 +659,11 @@ paths:
   /users/{id}/whitelist:
     put:
       tags: [Administration]
-      summary: Configuration de la whitelist IP
+      summary: Active/désactive la restriction aux appareils reconnus
+      description: >-
+        Bascule le drapeau `whitelist_only`. Garde-fou : activer la restriction
+        alors que l'utilisateur n'a aucun appareil reconnu est refusé
+        (`400 bad_request`), sous peine de verrouiller le compte définitivement.
       security:
         - bearerAuth: []
       parameters:
@@ -643,10 +681,6 @@ paths:
               properties:
                 whitelist_only:
                   type: boolean
-                allowed_ips:
-                  type: array
-                  items:
-                    type: string
       responses:
         '200':
           description: Profil mis à jour
@@ -654,6 +688,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Profile'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /users/{id}/devices/{device_id}:
+    delete:
+      tags: [Administration]
+      summary: Révoque un appareil reconnu
+      description: >-
+        Retire un appareil de la liste `devices[]` de l'utilisateur. Garde-fou :
+        si le compte est en `whitelist_only` et qu'il ne reste qu'un seul
+        appareil, la suppression est refusée (`400 bad_request`).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: device_id
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Appareil révoqué
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
   /analytics/traffic:
@@ -722,7 +780,7 @@ paths:
                   type: string
                 portal:
                   type: string
-                  enum: [admin, drive, home, budgy]
+                  enum: [admin, drive, home, budgy, maloe]
       responses:
         '201':
           description: Rôle créé

@@ -1,6 +1,6 @@
 # CH-Portal-Budgy
 
-Portail de gestion budgétaire personnel de l'écosystème **CustHome** : rattachement de comptes bancaires via le consentement PSD2/AIS, tableau de bord (soldes, reste à dépenser, prévisionnel), consultation et catégorisation des transactions, gestion et renouvellement des consentements. Réservé aux utilisateurs disposant du rôle Budgy.
+Portail de gestion budgétaire personnel de l'écosystème **CustHome** : rattachement de comptes bancaires via le consentement PSD2/AIS, tableau de bord (soldes, reste à dépenser, budgets, prévisionnel), consultation et catégorisation des transactions, gestion et renouvellement des consentements. Réservé aux utilisateurs disposant du rôle Budgy.
 
 ![React](https://img.shields.io/badge/React-19-61dafb) ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6) ![Vite](https://img.shields.io/badge/Vite-7-646cff) ![canopui](https://img.shields.io/badge/canopui-latest-lightgrey) ![Express](https://img.shields.io/badge/Express-5-000000)
 
@@ -31,19 +31,20 @@ Toutes les routes (hors `/forbidden`) sont protégées par la garde **`RequireBu
 | `/banque` | `RattacherBanque` | `RequireBudgy` (`budgy`) | Sélection d'une banque (`BankSelector`) et lancement du consentement (redirection vers l'URL d'autorisation de la banque) |
 | `/banque/callback` | `RattacherBanqueCallback` | `RequireBudgy` (`budgy`) | Retour du consentement : finalisation, affichage des comptes rattachés ; gère aussi le cas renouvellement |
 | `/comptes` | `MesComptes` | `RequireBudgy` (`budgy`) | Liste des comptes avec solde ; alertes de reconsentement et bannière de renouvellement ; rechargement sur événement du relais |
-| `/comptes/:accountId` | `TransactionsCompte` | `RequireBudgy` (`budgy`) | Transactions paginées d'un compte, catégorisation et création de règle en un clic ; rechargement sur événement du relais |
-| `/categories` | `Categories` | `RequireBudgy` (`budgy`) | Catégories du propriétaire : création (couleur + icône), modification, suppression |
-| `/consentements` | `Consentements` | `RequireBudgy` (`budgy`) | Liste des consentements (statut, échéance) avec renouvellement des éligibles ; carte de rattachement d'une nouvelle banque |
+| `/comptes/:accountId` | `TransactionsCompte` | `RequireBudgy` (`budgy`) | Transactions paginées d'un compte : catégorisation, affectation à un budget (enveloppe) via `TransactionEnveloppePicker`, et proposition de création de règle après catégorisation (`RegleProposalPanel`) ; rechargement sur événement du relais |
+| `/categories` | `Categories` | `RequireBudgy` (`budgy`) | Catégories du propriétaire : création (couleur + icône), modification, suppression ; gestion des budgets « Mes budgets » (enveloppes, `EnveloppesSection`) : création (nom, montant, couleur + icône), modification, suppression |
+| `/consentements` | `Consentements` | `RequireBudgy` (`budgy`) | Liste des consentements (statut, échéance) avec renouvellement des éligibles ; carte de rattachement d'une nouvelle banque ; carte de réglage du jour de départ du mois budgétaire (`JourDebutMoisCard`) |
 | `*` | — | `RequireBudgy` (`budgy`) | Redirige vers `/` |
 
-Les pages `/home`, `/transactions` et `/budgets` ont été retirées : l'accueil faisait doublon avec le tableau de bord, la liste transverse des transactions avec le détail d'un compte, et la saisie de budgets est devenue inutile depuis que le reste à dépenser se prédit seul.
+Les pages `/home` et `/transactions` ont été retirées : l'accueil faisait doublon avec le tableau de bord, et la liste transverse des transactions avec le détail d'un compte. La saisie de budgets, en revanche, est **de retour** sous la forme d'**enveloppes** (« Mes budgets ») : sans page ni route dédiée, elles se gèrent depuis la page Catégories (`EnveloppesSection`) et se suivent sur le tableau de bord (`EnveloppesBlock`).
 
 ### Tableau de bord
 
-Trois blocs, **mois courant uniquement** (pas de navigation mensuelle) :
+Quatre blocs, **cycle courant uniquement** (pas de navigation mensuelle sur le tableau de bord ; le « mois » est le cycle budgétaire dont le jour de départ est réglable, voir plus bas) :
 
 - **Soldes consolidés** — total tous comptes et détail par compte, avec le **solde à venir** quand la banque l'expose (Boursorama oui, Crédit Agricole non).
 - **Reste à dépenser** — une ligne par catégorie, filtrables par un `Select` mono-catégorie, et un total égal à la somme des lignes. Le dépassement se lit au reste négatif.
+- **Mes budgets** — suivi des enveloppes (`EnveloppesBlock`) : une ligne par budget (nom, montant prévu, consommé, reste, dépassement). Le bloc reste absent tant qu'aucune enveloppe n'existe.
 - **Budget prévisionnel** — solde du mois et ses deux composantes (revenus, dépenses récurrentes), ou un état « données insuffisantes ».
 
 Au montage du layout, le portail appelle la réconciliation côté API : les données se réparent seules, sans écran d'administration.
@@ -67,9 +68,12 @@ Client canopui `createApiClient({ basePath: "/api", withRefresh: true })` ; pré
 | Banques | `/budgy/v1/banks` |
 | Consentements | `/budgy/v1/consents` (GET/POST), `/budgy/v1/consents/callback` (POST), `/budgy/v1/consents/:id/renew` (POST) |
 | Comptes | `/budgy/v1/accounts`, `/budgy/v1/balance` |
-| Transactions | `/budgy/v1/accounts/:id/transactions?limit=&offset=`, `/budgy/v1/accounts/:id/transactions/:tx/category` (PUT), `/budgy/v1/accounts/:id/transactions/:tx/rule` (POST), `/budgy/v1/transactions/recategoriser` (POST) |
+| Transactions | `/budgy/v1/accounts/:id/transactions?limit=&offset=`, `/budgy/v1/accounts/:id/transactions/:tx/category` (PUT), `/budgy/v1/accounts/:id/transactions/:tx/rule` (POST), `/budgy/v1/categorization-rules` (POST), `/budgy/v1/transactions/:id/enveloppe` (PUT — affecte/retire un budget), `/budgy/v1/transactions/recategoriser` (POST) |
 | Catégories | `/budgy/v1/categories` (GET/POST), `/budgy/v1/categories/:id` (PUT/DELETE) |
-| Agrégats | `/budgy/v1/budgets/remaining?month=`, `/budgy/v1/forecast?month=` |
+| Budgets (enveloppes) | `/budgy/v1/enveloppes` (GET/POST), `/budgy/v1/enveloppes/:id` (PUT/DELETE) |
+| Budgets mensuels par catégorie | `/budgy/v1/budgets?mois=` (GET), `/budgy/v1/budgets` (POST), `/budgy/v1/budgets/remaining?month=` (GET) |
+| Préférences | `/budgy/v1/preferences` (GET/PUT — jour de départ du mois budgétaire) |
+| Agrégats | `/budgy/v1/expenses/by-category?month=`, `/budgy/v1/forecast?month=` |
 
 Voir la documentation de l'API : [../CH-Api-Budgy/README.md](../CH-Api-Budgy/README.md) et [../CH-Api-Authenticator/README.md](../CH-Api-Authenticator/README.md) — routées par la [gateway](../CH-Api-GateWay/README.md).
 
@@ -107,6 +111,9 @@ Variables optionnelles du relais temps réel (lues par `src/relay/config.ts`, ab
 - **Documents légaux** : le dépôt fournit un `PRIVACY.md` (politique de confidentialité) et un `TERMS.md`, exposés dans l'interface via `LegalLinks` et `infoHref` (lien CGU vers le portail Authenticator). Budgy est décrit comme une application de gestion budgétaire à usage strictement personnel s'appuyant sur les services d'information sur les comptes (AIS) PSD2 via Enable Banking.
 - **Flux de consentement PSD2** : sélection d'une banque → initiation d'un consentement → redirection vers l'URL d'autorisation de la banque → retour sur `/banque/callback` pour finalisation ; les consentements arrivant à échéance peuvent être renouvelés (même écran de callback réutilisé).
 - **Relais temps réel (MQTT)** : optionnel ; lorsqu'il est configuré, les pages Comptes et Transactions se rechargent automatiquement sur événement, et un toast signale les erreurs de synchronisation.
+- **Budgets en enveloppes (« Mes budgets »)** : budgets libres, indépendants des catégories, avec montant, consommation et dépassement. CRUD depuis la page Catégories (`EnveloppesSection` / `EnveloppeEditorPanel`), affectation d'une transaction à un budget depuis la liste des transactions, suivi sur le tableau de bord.
+- **Jour de départ du mois budgétaire configurable** : réglé via `/budgy/v1/preferences` (`jour_debut_mois`) depuis une carte de la page Consentements (`JourDebutMoisCard`). Le cycle porte le nom du mois de son dernier jour ; reste à dépenser, budgets et prévisionnel se calent dessus.
+- **Virements internes** : une transaction marquée `is_internal_transfer` (virement entre deux comptes du propriétaire) s'affiche avec la mention « Virement interne, non compté » et reste exclue des dépenses, des revenus et du prévisionnel.
 - **Généralisation des banques** : les caisses régionales du Crédit Agricole sont fusionnées en une entrée « Crédit Agricole » (`lib/banks.ts`). L'API en expose une quarantaine, qui redirigent toutes vers la même page de sélection d'agence. Un Crédit Agricole hors France reste distinct.
 - **Dépendance canopui non épinglée en pratique** : `package.json` déclare une borne (`^2.3.0`), mais le job `build` de la CI exécute `npm install canopui@latest` avant de builder — l'artefact déployé embarque toujours la dernière version publiée. Règle d'équipe : un composant manquant s'ajoute **au design system**, pas en local.
 

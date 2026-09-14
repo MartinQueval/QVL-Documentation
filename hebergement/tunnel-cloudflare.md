@@ -37,10 +37,13 @@ A **Cloudflare Tunnel** makes services hosted on the QVL machine publicly reacha
 ```mermaid
 flowchart LR
     V["🌍 Visitor<br/>https://canopui.qvl-project.com"] -->|HTTPS| CF["☁️ Cloudflare<br/>DNS + TLS certificate<br/>+ DDoS protection"]
-    CF <-->|"outbound-only tunnel<br/>(the machine calls out)"| CD["🖥️ QVL machine<br/><code>cloudflared</code> service"]
+    CF <-->|"outbound-only tunnel<br/>(the machine calls out)"| CD["🖥️ QVL machine<br/><code>cloudflared</code> Windows service"]
+    CD --> S0["🏠 ProjectCenter — apex<br/>localhost:8300"]
     CD --> S1["🎨 Vitrine CanopUI<br/>localhost:8081"]
     CD --> S2["📦 npm registry<br/>localhost:4873"]
     CD --> S3["🦊 GitLab CE<br/>localhost:8929"]
+    CD --> S4["🏡 CustHome services<br/>localhost:3200-3203, 8083"]
+    CD --> S5["🍸 Hobbies + PipeBoard<br/>localhost:8310-8314, 5191"]
     style CF fill:#fef0e6,stroke:#f38020,color:#000
     style CD fill:#e7f0ff,stroke:#1f6feb,color:#000
 ```
@@ -54,11 +57,24 @@ Key facts:
 
 ## 🗺️ Exposed services
 
-| Public URL | Service | Local target |
+The real ingress list lives in `C:\Users\marti\.cloudflared\config.yml`. Current routes:
+
+| Public URL | Local target | Service |
 |---|---|---|
-| `canopui.qvl-project.com` | 🎨 CanopUI showcase (Ladle) | `localhost:8081` |
-| `npm.qvl-project.com` | 📦 Private npm registry (Verdaccio) | `localhost:4873` |
-| `gitlab.qvl-project.com` | 🦊 Self-hosted GitLab (mirror) | `localhost:8929` |
+| `qvl-project.com` (apex) | `localhost:8300` | 🏠 QVL-ProjectCenter (React SPA, `serve-vitrine.mjs`) |
+| `canopui.qvl-project.com` | `localhost:8081` | 🎨 CanopUI showcase (`serve-vitrine.mjs`, static build) |
+| `npm.qvl-project.com` | `localhost:4873` | 📦 Private npm registry (Verdaccio) |
+| `gitlab.qvl-project.com` | `localhost:8929` | 🦊 Self-hosted GitLab CE (active ingress) |
+| `ch-auth.qvl-project.com` | `localhost:3200` | 🏡 CustHome — Authenticator (portal) |
+| `ch-admin.qvl-project.com` | `localhost:3201` | 🏡 CustHome — Admin |
+| `ch-drive.qvl-project.com` | `localhost:3202` | 🏡 CustHome — Drive |
+| `ch-budgy.qvl-project.com` | `localhost:3203` | 🏡 CustHome — Budgy |
+| `ch-relay.qvl-project.com` | `localhost:8083` | 🏡 CustHome — Relay MQTT-over-WebSocket |
+| `tb-pipeboard.qvl-project.com` | `localhost:5191` | 🧰 ToolBox — PipeBoard |
+| `api-cocktail.qvl-project.com` | `localhost:8310` | 🍸 Hobbies — HB-Api-Cocktail (Go) |
+| `statbar.qvl-project.com` | `localhost:8312` | 🍸 Hobbies — HB-Front-StatBar |
+| `fonddeshaker.qvl-project.com` | `localhost:8313` | 🍸 Hobbies — HB-Front-FondDeShaker |
+| `departemental.qvl-project.com` | `localhost:8314` | 🍸 Hobbies — HB-Front-DeparteMental |
 
 ## ➕ Adding a new service
 
@@ -66,14 +82,22 @@ Three steps, ~2 minutes:
 
 1. Make the service listen on a local port — e.g. `localhost:3001`.
 2. Create the DNS route: `cloudflared tunnel route dns qvl-infra newapp.qvl-project.com`
-3. Add an ingress block to the tunnel configuration, then restart the `cloudflared` service:
+3. Add an ingress block to the tunnel configuration file (`C:\Users\marti\.cloudflared\config.yml`), then restart the `cloudflared` service:
 
 ```yaml
 - hostname: newapp.qvl-project.com
   service: http://localhost:3001
 ```
 
+> ⚙️ **Restarting cloudflared** — `cloudflared` runs as a **Windows service**, so restarting it requires **UAC elevation**. From an elevated shell (or by launching one on the fly):
+>
+> ```powershell
+> Start-Process powershell -Verb RunAs -ArgumentList '-Command','Restart-Service Cloudflared -Force'
+> ```
+
 > ⚠️ **Port discipline** — never reuse a port already taken by the infrastructure (see table above) or by GitLab's internal services. Each new app gets its own dedicated port.
+
+> 🗂️ **Service scripts** — the runtime scripts that actually start these local services live in `C:\QVL\deploy\` (e.g. `serve-vitrine.mjs`, shared by the **CanopUI showcase (8081)** *and* the **ProjectCenter apex (8300)**; `serve-*.ps1`; the WSL `wsl-keepalive.ps1`). ⚠️ **This folder is not versioned** — a backup blind spot to address. It also holds a runtime secret (a Brevo API key) **in clear text**, to be secured.
 
 ## ❓ FAQ
 
@@ -111,10 +135,13 @@ Un **Cloudflare Tunnel** rend les services hébergés sur la machine QVL accessi
 ```mermaid
 flowchart LR
     V["🌍 Visiteur<br/>https://canopui.qvl-project.com"] -->|HTTPS| CF["☁️ Cloudflare<br/>DNS + certificat TLS<br/>+ protection DDoS"]
-    CF <-->|"tunnel sortant uniquement<br/>(la machine appelle vers l'extérieur)"| CD["🖥️ Machine QVL<br/>service <code>cloudflared</code>"]
+    CF <-->|"tunnel sortant uniquement<br/>(la machine appelle vers l'extérieur)"| CD["🖥️ Machine QVL<br/>service Windows <code>cloudflared</code>"]
+    CD --> S0["🏠 ProjectCenter — apex<br/>localhost:8300"]
     CD --> S1["🎨 Vitrine CanopUI<br/>localhost:8081"]
     CD --> S2["📦 Registre npm<br/>localhost:4873"]
     CD --> S3["🦊 GitLab CE<br/>localhost:8929"]
+    CD --> S4["🏡 Services CustHome<br/>localhost:3200-3203, 8083"]
+    CD --> S5["🍸 Hobbies + PipeBoard<br/>localhost:8310-8314, 5191"]
     style CF fill:#fef0e6,stroke:#f38020,color:#000
     style CD fill:#e7f0ff,stroke:#1f6feb,color:#000
 ```
@@ -128,11 +155,24 @@ Les points clés :
 
 ## 🗺️ Services exposés
 
-| URL publique | Service | Cible locale |
+La liste d'ingress réelle vit dans `C:\Users\marti\.cloudflared\config.yml`. Routes actuelles :
+
+| URL publique | Cible locale | Service |
 |---|---|---|
-| `canopui.qvl-project.com` | 🎨 Vitrine CanopUI (Ladle) | `localhost:8081` |
-| `npm.qvl-project.com` | 📦 Registre npm privé (Verdaccio) | `localhost:4873` |
-| `gitlab.qvl-project.com` | 🦊 GitLab auto-hébergé (miroir) | `localhost:8929` |
+| `qvl-project.com` (apex) | `localhost:8300` | 🏠 QVL-ProjectCenter (SPA React, `serve-vitrine.mjs`) |
+| `canopui.qvl-project.com` | `localhost:8081` | 🎨 Vitrine CanopUI (`serve-vitrine.mjs`, build statique) |
+| `npm.qvl-project.com` | `localhost:4873` | 📦 Registre npm privé (Verdaccio) |
+| `gitlab.qvl-project.com` | `localhost:8929` | 🦊 GitLab CE auto-hébergé (ingress actif) |
+| `ch-auth.qvl-project.com` | `localhost:3200` | 🏡 CustHome — Authenticator (portail) |
+| `ch-admin.qvl-project.com` | `localhost:3201` | 🏡 CustHome — Admin |
+| `ch-drive.qvl-project.com` | `localhost:3202` | 🏡 CustHome — Drive |
+| `ch-budgy.qvl-project.com` | `localhost:3203` | 🏡 CustHome — Budgy |
+| `ch-relay.qvl-project.com` | `localhost:8083` | 🏡 CustHome — Relay MQTT-over-WebSocket |
+| `tb-pipeboard.qvl-project.com` | `localhost:5191` | 🧰 ToolBox — PipeBoard |
+| `api-cocktail.qvl-project.com` | `localhost:8310` | 🍸 Hobbies — HB-Api-Cocktail (Go) |
+| `statbar.qvl-project.com` | `localhost:8312` | 🍸 Hobbies — HB-Front-StatBar |
+| `fonddeshaker.qvl-project.com` | `localhost:8313` | 🍸 Hobbies — HB-Front-FondDeShaker |
+| `departemental.qvl-project.com` | `localhost:8314` | 🍸 Hobbies — HB-Front-DeparteMental |
 
 ## ➕ Ajouter un nouveau service
 
@@ -140,14 +180,22 @@ Trois étapes, ~2 minutes :
 
 1. Faire écouter le service sur un port local — ex. `localhost:3001`.
 2. Créer la route DNS : `cloudflared tunnel route dns qvl-infra newapp.qvl-project.com`
-3. Ajouter un bloc d'ingress à la configuration du tunnel, puis redémarrer le service `cloudflared` :
+3. Ajouter un bloc d'ingress au fichier de configuration du tunnel (`C:\Users\marti\.cloudflared\config.yml`), puis redémarrer le service `cloudflared` :
 
 ```yaml
 - hostname: newapp.qvl-project.com
   service: http://localhost:3001
 ```
 
+> ⚙️ **Redémarrer cloudflared** — `cloudflared` tourne en **service Windows** : son redémarrage exige donc une **élévation UAC**. Depuis un shell élevé (ou en en lançant un à la volée) :
+>
+> ```powershell
+> Start-Process powershell -Verb RunAs -ArgumentList '-Command','Restart-Service Cloudflared -Force'
+> ```
+
 > ⚠️ **Discipline des ports** — ne jamais réutiliser un port déjà pris par l'infrastructure (voir tableau ci-dessus) ou par les services internes de GitLab. Chaque nouvelle application reçoit son propre port dédié.
+
+> 🗂️ **Scripts de service** — les scripts d'exécution qui démarrent réellement ces services locaux vivent dans `C:\QVL\deploy\` (ex. `serve-vitrine.mjs`, partagé par la **vitrine CanopUI (8081)** *et* l'**apex ProjectCenter (8300)** ; `serve-*.ps1` ; le `wsl-keepalive.ps1` côté WSL). ⚠️ **Ce dossier n'est pas versionné** — un angle mort de sauvegarde à traiter. Il contient aussi un secret runtime (une clé API Brevo) **en clair**, à sécuriser.
 
 ## ❓ FAQ
 

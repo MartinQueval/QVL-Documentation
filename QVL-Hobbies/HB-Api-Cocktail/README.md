@@ -1,8 +1,8 @@
 # HB-Api-Cocktail
 
 <p align="center">
-  <em>Cocktails API of the QVL Hobbies domain — public read-only, local-only writes.</em><br>
-  <em>API cocktails du domaine QVL Hobbies — lecture publique, écriture locale uniquement.</em>
+  <em>Cocktails API of the QVL Hobbies domain — public read, local token write, public cookie preferences.</em><br>
+  <em>API cocktails du domaine QVL Hobbies — lecture publique, écriture locale par token, préférences publiques par cookies.</em>
 </p>
 
 <p align="center">
@@ -19,9 +19,15 @@
 
 <a id="-english"></a>
 
-Standalone Go service of the **Hobbies** domain serving cocktail recipes. It exposes a **public read-only** surface (list, search by ingredients, detail, reference data, images) plus a **non-public local write** endpoint, reachable only over loopback (`127.0.0.1`) and protected by a bearer token. Recipe text content is in **English**.
+Standalone Go service of the **Hobbies** domain serving cocktail recipes. It exposes three families of endpoints:
 
-Unlike the CustHome services, this API is **not fronted by a gateway**: it is a single local process, bound to loopback by default.
+- **Public read** (list, search by ingredients, detail, reference data, images);
+- **Local token write** — `POST /cocktails`, reachable only over loopback (`127.0.0.1`) and protected by a bearer token;
+- **Public cookie preferences** — `GET`/`PUT /preferences`, a **public** write surface that stores the visitor's bar and favourites entirely in server-set `HttpOnly` cookies (`hb_bar`, `hb_fav`). The service stays **stateless**: no database row, no account, no session id.
+
+Recipe text content is in **English**.
+
+Unlike the CustHome services, this API is **not fronted by a gateway**: it is a single local process, bound to loopback and exposed in production behind Cloudflare Tunnel under `api-cocktail.qvl-project.com`.
 
 ## Stack
 
@@ -35,14 +41,16 @@ Unlike the CustHome services, this API is **not fronted by a gateway**: it is a 
 
 ## Default port
 
-`127.0.0.1:8080` (`BIND_ADDR` = `127.0.0.1`, `PORT` = `8080`). The service binds to loopback by default, which already restricts exposure of the write endpoint.
+`127.0.0.1:8080` in code (`BIND_ADDR` = `127.0.0.1`, `PORT` = `8080` fallbacks). In **production** the service listens on **`127.0.0.1:8310`** (systemd unit `hb-api-cocktail`, `PORT=8310`), exposed behind Cloudflare Tunnel under `https://api-cocktail.qvl-project.com`. The service binds to loopback by default, which already restricts exposure of the local write endpoint.
 
 ## Key concepts
 
 - **Public read, local write** : all read routes are public; `POST /cocktails` is **mounted only if `LOCAL_WRITE_TOKEN` is set** and remains reserved to authenticated loopback calls.
+- **Public cookie preferences** : `GET`/`PUT /preferences` are **public** (no token, no loopback restriction). They carry the visitor's `bar` and `favorites` entirely in two server-set `HttpOnly` cookies (`hb_bar`, `hb_fav`, format `v1.<id>.<id>`, `SameSite=Lax`, `Max-Age` one year, sliding window). The API is **stateless** — it stores nothing. Body is capped at **16 KiB**, each list at **300 IDs** (deduplicated, IDs `1..999999999`); an empty array clears the matching cookie. `PUT` replaces the whole state (both fields required); IDs are never cross-checked against the catalogue.
 - **Ingredient search** : `GET /cocktails/search` accepts a comma-separated `ingredients` list and a `match` strategy — `all` (default) requires every ingredient, `any` requires at least one. An unknown ingredient simply narrows the matches (down to an empty list), never an error.
 - **Images served by name** : images are exposed via `GET /images/{name}`. The API returns only the image **file name** (field `image`) — **never** the on-disk path.
 - **SQLite schema** : `cocktails`, `ingredients`, `cocktail_ingredients` (many-to-many link with `quantity`/`unit`), `cocktail_tags` (one tag = one row). Links are `ON DELETE CASCADE`. The schema is applied idempotently at startup.
+- **Production data (indicative)** : the prod database currently holds **177 ingredients and 0 cocktails** — the reference data is seeded, recipes are still to be added by the author.
 - **No config file loading** : the service reads only its process environment (no dotenv loader). Variables must be injected into the environment before launch.
 
 ## Configuration
@@ -70,6 +78,8 @@ The full v1 surface described in `openapi.yaml` is implemented. Read routes are 
 | GET | `/categories` | public | Distinct categories (string array) | 200, 500 |
 | GET | `/tags` | public | Distinct tags (string array) | 200, 500 |
 | GET | `/images/{name}` | public | Cocktail image | 200 (`image/*`), 404, 500 |
+| GET | `/preferences` | public | Read the visitor's `bar` and `favorites` from cookies (missing/corrupt = empty lists) | 200 `Preferences` |
+| PUT | `/preferences` | public | Replace the full preferences state; sets/clears the `hb_bar`/`hb_fav` cookies | 200 `Preferences`, 400, 413 |
 | POST | `/cocktails` | local (loopback + bearer) | Create a recipe and upload its image (multipart) | 201 `Cocktail`, 400, 401, 403, 413, 500 |
 | GET | `/health` | none | Liveness probe | 200 `{"status":"ok"}` |
 | GET | `/openapi.yaml` | none | Raw OpenAPI contract | 200 (`application/yaml`) |
@@ -116,6 +126,17 @@ API objects are distinct from the SQL schema. The storage path is never exposed:
 
 Reference endpoints return arrays directly: `/ingredients` an array of `{id, name}`, `/categories` and `/tags` string arrays.
 
+## `Preferences` object (DTO)
+
+`GET`/`PUT /preferences` exchange a `Preferences` object: two integer-id arrays, always present, never `null`, deduplicated and capped at 300 entries.
+
+| Field | Type | Detail |
+|---|---|---|
+| `bar` | integer array | Ingredient IDs of the visitor's bar (`1..999999999`) |
+| `favorites` | integer array | Favourite cocktail IDs (`1..999999999`) |
+
+`PUT` takes a `PreferencesInput` with the exact same shape: **both fields are required**, unknown fields are rejected, field names are case-sensitive. An empty array deletes the matching cookie (there is no `PATCH`, `DELETE` nor per-item endpoint). The state is carried entirely by the `hb_bar`/`hb_fav` cookies; the API keeps nothing server-side.
+
 ## Versioning
 
 The contract version is **1.0.0**. The v1 surface is exposed **at the root** (no version prefix in paths, unlike the CustHome services under `/v1`). Operational routes (`/health`, `/openapi.yaml`, `/docs`) are not versioned.
@@ -132,9 +153,15 @@ See [openapi.yaml](openapi.yaml).
 
 <a id="-français"></a>
 
-Service Go autonome du domaine **Hobbies** dédié aux recettes de cocktails. Il expose une surface **publique en lecture seule** (liste, recherche par ingrédients, détail, référentiels, images) ainsi qu'un endpoint d'**écriture locale non public**, joignable uniquement en loopback (`127.0.0.1`) et protégé par un token bearer. Le contenu textuel des recettes est en **anglais**.
+Service Go autonome du domaine **Hobbies** dédié aux recettes de cocktails. Il expose trois familles d'endpoints :
 
-Contrairement aux services CustHome, cette API n'est **pas exposée derrière une gateway** : c'est un unique process local, lié au loopback par défaut.
+- **Lecture publique** (liste, recherche par ingrédients, détail, référentiels, images) ;
+- **Écriture locale par token** — `POST /cocktails`, joignable uniquement en loopback (`127.0.0.1`) et protégée par un token bearer ;
+- **Préférences publiques par cookies** — `GET`/`PUT /preferences`, une surface d'écriture **publique** qui stocke le bar et les favoris du visiteur intégralement dans des cookies `HttpOnly` posés par le serveur (`hb_bar`, `hb_fav`). Le service reste **sans état** : ni ligne en base, ni compte, ni identifiant de session.
+
+Le contenu textuel des recettes est en **anglais**.
+
+Contrairement aux services CustHome, cette API n'est **pas exposée derrière une gateway** : c'est un unique process local, lié au loopback et exposé en production derrière Cloudflare Tunnel sous `api-cocktail.qvl-project.com`.
 
 ## Stack
 
@@ -148,14 +175,16 @@ Contrairement aux services CustHome, cette API n'est **pas exposée derrière un
 
 ## Port par défaut
 
-`127.0.0.1:8080` (`BIND_ADDR` = `127.0.0.1`, `PORT` = `8080`). Le service se lie au loopback par défaut, ce qui restreint déjà l'exposition de l'endpoint d'écriture.
+`127.0.0.1:8080` dans le code (valeurs de repli `BIND_ADDR` = `127.0.0.1`, `PORT` = `8080`). En **production**, le service écoute sur **`127.0.0.1:8310`** (unité systemd `hb-api-cocktail`, `PORT=8310`), exposé derrière Cloudflare Tunnel sous `https://api-cocktail.qvl-project.com`. Le service se lie au loopback par défaut, ce qui restreint déjà l'exposition de l'endpoint d'écriture locale.
 
 ## Concepts clés
 
 - **Lecture publique, écriture locale** : toutes les routes de lecture sont publiques ; `POST /cocktails` n'est **monté que si `LOCAL_WRITE_TOKEN` est défini** et reste réservé aux appels loopback authentifiés.
+- **Préférences publiques par cookies** : `GET`/`PUT /preferences` sont **publiques** (pas de token, pas de restriction loopback). Elles portent le `bar` et les `favorites` du visiteur intégralement dans deux cookies `HttpOnly` posés par le serveur (`hb_bar`, `hb_fav`, format `v1.<id>.<id>`, `SameSite=Lax`, `Max-Age` d'un an, fenêtre glissante). L'API est **sans état** — elle ne stocke rien. Corps plafonné à **16 Kio**, chaque liste à **300 identifiants** (dédoublonnés, IDs `1..999999999`) ; un tableau vide supprime le cookie correspondant. Le `PUT` remplace l'état complet (les deux champs obligatoires) ; les IDs ne sont jamais croisés avec le référentiel.
 - **Recherche par ingrédients** : `GET /cocktails/search` accepte une liste `ingredients` séparée par des virgules et une stratégie `match` — `all` (défaut) exige tous les ingrédients, `any` en exige au moins un. Un ingrédient inconnu réduit simplement les correspondances (jusqu'à une liste vide), sans erreur.
 - **Images servies par nom** : les images sont exposées via `GET /images/{name}`. L'API ne renvoie que le **nom de fichier** de l'image (champ `image`) — **jamais** le chemin sur disque.
 - **Schéma SQLite** : `cocktails`, `ingredients`, `cocktail_ingredients` (liaison many-to-many avec `quantity`/`unit`), `cocktail_tags` (un tag = une ligne). Les liaisons sont en `ON DELETE CASCADE`. Le schéma est appliqué de façon idempotente au démarrage.
+- **Données de production (indicatif)** : la base de prod contient actuellement **177 ingrédients et 0 cocktail** — le référentiel est amorcé, les recettes restent à ajouter par l'auteur.
 - **Aucun chargement de fichier de config** : le service lit uniquement l'environnement de son process (pas de loader dotenv). Les variables doivent être injectées dans l'environnement avant le lancement.
 
 ## Configuration
@@ -183,6 +212,8 @@ Toute la surface v1 décrite dans `openapi.yaml` est implémentée. Les routes d
 | GET | `/categories` | public | Catégories distinctes (tableau de chaînes) | 200, 500 |
 | GET | `/tags` | public | Tags distincts (tableau de chaînes) | 200, 500 |
 | GET | `/images/{name}` | public | Image d'un cocktail | 200 (`image/*`), 404, 500 |
+| GET | `/preferences` | public | Lit le `bar` et les `favorites` du visiteur depuis les cookies (absent/corrompu = listes vides) | 200 `Preferences` |
+| PUT | `/preferences` | public | Remplace l'état complet des préférences ; pose/supprime les cookies `hb_bar`/`hb_fav` | 200 `Preferences`, 400, 413 |
 | POST | `/cocktails` | local (loopback + bearer) | Ajout d'une recette et upload d'image (multipart) | 201 `Cocktail`, 400, 401, 403, 413, 500 |
 | GET | `/health` | non | Sonde de vivacité | 200 `{"status":"ok"}` |
 | GET | `/openapi.yaml` | non | Contrat OpenAPI brut | 200 (`application/yaml`) |
@@ -229,6 +260,17 @@ Les objets renvoyés par l'API sont distincts du schéma SQL. Le chemin de stock
 
 Les référentiels renvoient directement des tableaux : `/ingredients` un tableau de `{id, name}`, `/categories` et `/tags` des tableaux de chaînes.
 
+## Objet `Preferences` (DTO)
+
+`GET`/`PUT /preferences` échangent un objet `Preferences` : deux tableaux d'identifiants entiers, toujours présents, jamais `null`, dédoublonnés et plafonnés à 300 éléments.
+
+| Champ | Type | Détail |
+|---|---|---|
+| `bar` | tableau d'entiers | Identifiants des ingrédients du bar du visiteur (`1..999999999`) |
+| `favorites` | tableau d'entiers | Identifiants des cocktails favoris (`1..999999999`) |
+
+Le `PUT` attend un `PreferencesInput` de forme identique : **les deux champs sont obligatoires**, les champs inconnus sont refusés, les noms de champs sont sensibles à la casse. Un tableau vide supprime le cookie correspondant (il n'existe ni `PATCH`, ni `DELETE`, ni endpoint par élément). L'état est porté intégralement par les cookies `hb_bar`/`hb_fav` ; l'API ne conserve rien côté serveur.
+
 ## Versionnement
 
 La version du contrat est **1.0.0**. La surface v1 est exposée **à la racine** (pas de préfixe de version dans les chemins, contrairement aux services CustHome sous `/v1`). Les routes opérationnelles (`/health`, `/openapi.yaml`, `/docs`) ne sont pas versionnées.
@@ -238,3 +280,7 @@ La version du contrat est **1.0.0**. La surface v1 est exposée **à la racine**
 Voir [openapi.yaml](openapi.yaml).
 
 </details>
+
+---
+
+<p align="center"><sub>© QVL — Documentation</sub></p>

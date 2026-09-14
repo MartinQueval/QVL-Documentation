@@ -41,9 +41,21 @@ A pipeline involves **two very different roles** — this distinction explains t
 | 🧠 **Orchestration** | gitlab.com | Decides *what* to run, displays results, keeps history |
 | 💪 **Computation** | The QVL machine (*runners*) | Actually *executes* the jobs — clones the code, runs the commands |
 
-Three **self-hosted runners** live on the QVL machine (inside WSL2). Because they are self-hosted, gitlab.com's free-tier minute quota is **never consumed** — computation is unlimited and free.
+Six **self-hosted runners** live on the QVL machine (inside WSL2), all set to `concurrent = 1` globally so they never overload the single home machine. Because they are self-hosted, gitlab.com's free-tier minute quota is **never consumed** — computation is unlimited and free.
 
 > 💡 The runner **clones its own fresh copy** of the repository for every job, straight from gitlab.com. The pipeline never depends on any folder previously present on the machine.
+
+### 🌍 One pipeline design for the whole ecosystem
+
+The CI is **not CanopUI-specific**. Every QVL project shares the same building blocks through **shared templates** hosted in **QVL-ToolBox/PipeLine**, pulled into each `.gitlab-ci.yml` with:
+
+```yaml
+include:
+  - remote: 'https://raw.githubusercontent.com/QVL-ToolBox/PipeLine/main/node.gitlab-ci.yml'
+  # or go.gitlab-ci.yml / rust.gitlab-ci.yml depending on the stack
+```
+
+Consumers of these templates include **ProjectCenter** (the apex site), **CustHome** (Rust/Go services), the **Hobbies** group, and **PipeBoard** — alongside CanopUI. Node, Go and Rust each get their own language template.
 
 ## 🏗️ The full flow
 
@@ -82,6 +94,17 @@ npm version patch          # bumps 1.0.1 → 1.0.2 and creates the tag
 git push origin main --tags
 # → pipeline: test ✓ build ✓ deploy ✓ publish ✓ — nothing else to do
 ```
+
+### 🍸 Deploying the Hobbies group
+
+The **Hobbies** group deploys onto WSL through its own group-scoped runner **`qvl-hobbies-wsl`** (gitlab.com **shared runners are disabled** for the group, so jobs always land on the QVL machine). Two shared deploy helpers do the work:
+
+| Helper | Deploys | Used by |
+|---|---|---|
+| `hb-deploy-node` | Node fronts + Node APIs | HB-Front-StatBar, HB-Front-FondDeShaker, HB-Front-DeparteMental, Node APIs |
+| `ch-deploy-bin` | compiled binary | HB-Api-Cocktail (Go) |
+
+Like the rest of the ecosystem, each Hobbies project runs an **`update-checkout`** job on `main` that **auto-pulls the server's local clone**, keeping the machine's source copy in sync.
 
 ## 🔐 Where do configuration & secrets live?
 
@@ -127,9 +150,21 @@ Une pipeline fait intervenir **deux rôles très différents** — cette distinc
 | 🧠 **Orchestration** | gitlab.com | Décide *quoi* lancer, affiche les résultats, garde l'historique |
 | 💪 **Calcul** | La machine QVL (*runners*) | *Exécute* réellement les jobs — clone le code, lance les commandes |
 
-Trois **runners auto-hébergés** vivent sur la machine QVL (dans WSL2). Parce qu'ils sont auto-hébergés, le quota de minutes du plan gratuit gitlab.com n'est **jamais entamé** — le calcul est illimité et gratuit.
+Six **runners auto-hébergés** vivent sur la machine QVL (dans WSL2), tous réglés en `concurrent = 1` global pour ne jamais surcharger l'unique machine du domicile. Parce qu'ils sont auto-hébergés, le quota de minutes du plan gratuit gitlab.com n'est **jamais entamé** — le calcul est illimité et gratuit.
 
 > 💡 Le runner **clone sa propre copie fraîche** du dépôt à chaque job, directement depuis gitlab.com. La pipeline ne dépend jamais d'un dossier déjà présent sur la machine.
+
+### 🌍 Une conception de pipeline pour tout l'écosystème
+
+La CI n'est **pas spécifique à CanopUI**. Chaque projet QVL partage les mêmes briques via des **templates partagés** hébergés dans **QVL-ToolBox/PipeLine**, inclus dans chaque `.gitlab-ci.yml` avec :
+
+```yaml
+include:
+  - remote: 'https://raw.githubusercontent.com/QVL-ToolBox/PipeLine/main/node.gitlab-ci.yml'
+  # ou go.gitlab-ci.yml / rust.gitlab-ci.yml selon la stack
+```
+
+Parmi les consommateurs de ces templates : **ProjectCenter** (le site apex), **CustHome** (services Rust/Go), le groupe **Hobbies** et **PipeBoard** — aux côtés de CanopUI. Node, Go et Rust ont chacun leur propre template de langage.
 
 ## 🏗️ Le flux complet
 
@@ -168,6 +203,17 @@ npm version patch          # passe 1.0.1 → 1.0.2 et crée le tag
 git push origin main --tags
 # → pipeline : test ✓ build ✓ deploy ✓ publish ✓ — rien d'autre à faire
 ```
+
+### 🍸 Déployer le groupe Hobbies
+
+Le groupe **Hobbies** se déploie sur WSL via son propre runner de groupe **`qvl-hobbies-wsl`** (les **shared runners** gitlab.com sont **désactivés** pour le groupe : les jobs atterrissent donc toujours sur la machine QVL). Deux helpers de déploiement partagés font le travail :
+
+| Helper | Déploie | Utilisé par |
+|---|---|---|
+| `hb-deploy-node` | fronts Node + API Node | HB-Front-StatBar, HB-Front-FondDeShaker, HB-Front-DeparteMental, API Node |
+| `ch-deploy-bin` | binaire compilé | HB-Api-Cocktail (Go) |
+
+Comme le reste de l'écosystème, chaque projet Hobbies exécute un job **`update-checkout`** sur `main` qui **auto-pull le clone local du serveur**, gardant la copie source de la machine synchronisée.
 
 ## 🔐 Où vivent la configuration & les secrets ?
 

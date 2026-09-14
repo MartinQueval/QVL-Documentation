@@ -4,7 +4,7 @@ info:
   description: >-
     Microservice Budgy CustHome : budget personnel avec agrégation bancaire
     (consentements, comptes, soldes, transactions).
-  version: 0.1.0
+  version: 1.0.2
 servers:
   - url: http://localhost:8183/v1
     description: Accès direct
@@ -17,6 +17,8 @@ tags:
   - name: Catégories
   - name: Règles
   - name: Budgets
+  - name: Enveloppes
+  - name: Préférences
   - name: Agrégats
   - name: Banques
   - name: Consentements
@@ -151,12 +153,25 @@ components:
           type: string
           format: uuid
           nullable: true
+        enveloppe_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Enveloppe (« budget » libre) à laquelle la transaction est affectée, le cas échéant.
         categorization_source:
           type: string
           enum: [manual, rule, none]
           description: >-
             Origine de la catégorisation. Les traitements automatiques ne
             touchent que les transactions en `none`.
+        is_internal_transfer:
+          type: boolean
+          default: false
+          description: >-
+            `true` si la transaction a été appariée comme virement interne entre
+            deux comptes du propriétaire (« Virement interne, non compté » côté
+            portail). Attribut d'affichage calculé par requête, exclu de tous les
+            agrégats.
     Bank:
       type: object
       properties:
@@ -377,6 +392,58 @@ components:
           type: array
           items: { $ref: '#/components/schemas/Budget' }
         total: { type: integer, format: int64 }
+    Enveloppe:
+      type: object
+      description: >-
+        « Budget » libre et manuel, indépendant d'un mois ou d'une catégorie.
+        Les champs de consommation sont calculés à la lecture.
+      properties:
+        id: { type: string, format: uuid }
+        nom: { type: string, maxLength: 30 }
+        icon: { type: string, example: wallet }
+        color: { type: string, example: '#5E35B1' }
+        montant_cents: { type: integer, format: int64 }
+        depense_cents: { type: integer, format: int64 }
+        restant_cents: { type: integer, format: int64 }
+        pourcentage_consomme: { type: integer, minimum: 0, maximum: 100 }
+        depasse: { type: boolean }
+        nombre_transactions: { type: integer, format: int64 }
+    EnveloppeRequest:
+      type: object
+      required: [nom, montant_cents]
+      properties:
+        nom: { type: string, maxLength: 30 }
+        icon: { type: string, nullable: true }
+        color: { type: string, nullable: true }
+        montant_cents: { type: integer, format: int64, minimum: 0 }
+    EnveloppeList:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Enveloppe' }
+        total: { type: integer, format: int64 }
+    AffectationEnveloppeRequest:
+      type: object
+      properties:
+        enveloppe_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Enveloppe cible ; `null` retire la transaction de son enveloppe.
+    Preferences:
+      type: object
+      properties:
+        jour_debut_mois:
+          type: integer
+          minimum: 1
+          maximum: 31
+          default: 1
+          description: >-
+            Jour de départ du cycle budgétaire (1 à 31). Un jour > 1 décale le
+            cycle sur le mois calendaire précédent ; un jour au-delà du dernier
+            jour du mois est ramené à celui-ci. Le cycle porte le nom du mois de
+            son dernier jour.
     RemainingBudgets:
       type: object
       properties:
@@ -660,6 +727,26 @@ paths:
               schema: { $ref: '#/components/schemas/RecategorizeResult' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /transactions/{transaction_id}/enveloppe:
+    put:
+      tags: [Enveloppes]
+      summary: Affecte ou retire une transaction d'une enveloppe
+      parameters:
+        - in: path
+          name: transaction_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AffectationEnveloppeRequest' }
+      responses:
+        '204': { description: Affectation mise à jour }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /balance:
     get:
       tags: [Agrégats]
@@ -817,6 +904,101 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /preferences:
+    get:
+      tags: [Préférences]
+      summary: Préférences du propriétaire
+      responses:
+        '200':
+          description: Préférences
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Preferences' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Préférences]
+      summary: Met à jour les préférences (jour de départ du mois)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Preferences' }
+      responses:
+        '200':
+          description: Préférences mises à jour
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Preferences' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /enveloppes:
+    get:
+      tags: [Enveloppes]
+      summary: Liste des enveloppes avec consommation
+      responses:
+        '200':
+          description: Enveloppes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnveloppeList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Enveloppes]
+      summary: Crée une enveloppe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnveloppeRequest' }
+      responses:
+        '201':
+          description: Enveloppe créée
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Enveloppe' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /enveloppes/{enveloppe_id}:
+    put:
+      tags: [Enveloppes]
+      summary: Modifie une enveloppe
+      parameters:
+        - in: path
+          name: enveloppe_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnveloppeRequest' }
+      responses:
+        '200':
+          description: Enveloppe modifiée
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Enveloppe' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Enveloppes]
+      summary: Supprime une enveloppe
+      parameters:
+        - in: path
+          name: enveloppe_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Enveloppe supprimée }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /expenses/by-category:
     get:
       tags: [Agrégats]

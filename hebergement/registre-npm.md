@@ -69,6 +69,7 @@ Publishing is restricted to authenticated accounts. In practice **nobody publish
 | Availability | Follows the machine — if it is off, installs fail until it is back (published versions are never lost) |
 | Web UI | <a href="https://npm.qvl-project.com">npm.qvl-project.com</a> in a browser — browse packages & versions |
 | Rights | install = everyone · publish/unpublish = authenticated only · account creation = open (`npm adduser`) |
+| Max package size | **`max_body_size: 60mb`** — Verdaccio's default is only 10 MB, raised to allow publishing CanopUI 3 (~33.5 MB tarball, otherwise a `413` at publish). Cloudflare (free plan) caps request bodies at ~100 MB — do not exceed it. Set in `C:\QVL\verdaccio\config.yaml` |
 
 </details>
 
@@ -121,6 +122,7 @@ La publication est réservée aux comptes authentifiés. En pratique **personne 
 | Disponibilité | Suit la machine — éteinte, les installs échouent jusqu'à son retour (les versions publiées ne sont jamais perdues) |
 | Interface web | <a href="https://npm.qvl-project.com">npm.qvl-project.com</a> dans un navigateur — parcourir paquets & versions |
 | Droits | installer = tout le monde · publier/dépublier = authentifiés uniquement · création de compte = ouverte (`npm adduser`) |
+| Taille max d'un paquet | **`max_body_size: 60mb`** — le défaut Verdaccio n'est que de 10 Mo, relevé pour permettre la publication de CanopUI 3 (~33,5 Mo de tarball, sinon un `413` au publish). Cloudflare (offre gratuite) plafonne les corps de requête à ~100 Mo — à ne pas dépasser. Réglé dans `C:\QVL\verdaccio\config.yaml` |
 
 </details>
 
